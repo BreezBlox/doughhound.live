@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <base target="_top">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script
+        src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <style>
+        /* Custom Dark Mode Tweaks */
+        body {
+            background-color: #0f172a;
+            color: #e2e8f0;
+        }
+
+        .card {
+            background-color: #1e293b;
+            border: 1px solid #334155;
+        }
+
+        .input-field {
+            background-color: #334155;
+            border-color: #475569;
+            color: white;
+        }
+    </style>
+</head>
+
+<body class="p-6 max-w-6xl mx-auto">
+
+    <!-- HEADER -->
+    <div class="flex justify-between items-center mb-8">
+        <div>
+            <h1 class="text-3xl font-bold text-sky-400">Dough Hound</h1>
+            <p class="text-slate-400">Reserve Balance Forecaster</p>
+        </div>
+        <div class="text-right">
+            <p class="text-xs uppercase tracking-widest text-slate-500">Current Reserve</p>
+            <div class="flex items-center justify-end gap-2 group">
+                <h2 id="currentBalance" class="text-4xl font-mono font-bold text-white">Loading...</h2>
+                <!-- Edit Button: Always visible, large touch target -->
+                <button onclick="toggleEditBalance()"
+                    class="p-2 text-slate-500 hover:text-sky-400 active:text-sky-600 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                        stroke="currentColor" class="w-6 h-6">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                    </svg>
+                </button>
+            </div>
+            <!-- Anchor Date Display -->
+            <div class="flex items-center justify-end gap-2 mt-1">
+                <p class="text-xs text-slate-500">As of: <span id="anchorDate" class="text-slate-400">—</span></p>
+                <button onclick="syncAnchorToToday()" title="Set anchor to today"
+                    class="text-xs text-sky-400 hover:text-sky-300 underline">
+                    Sync to Today
+                </button>
+            </div>
+            <!-- Hidden Edit Form -->
+            <div id="editBalanceForm" class="hidden mt-2 flex justify-end gap-2 items-center">
+                <input type="number" id="newBalanceInput" class="input-field w-32 rounded p-2 text-right text-lg"
+                    placeholder="New Balance">
+                <button onclick="saveBalance()"
+                    class="bg-sky-500 text-white px-4 py-2 rounded font-bold shadow-lg hover:bg-sky-400 active:bg-sky-600">Save</button>
+                <button onclick="toggleEditBalance()" class="p-2 text-slate-500 hover:text-white text-xl">✕</button>
+            </div>
+
+            <!-- QUICK ADD SECTION -->
+            <div class="mt-4 border-t border-slate-700 pt-2">
+                <div id="quickAddTrigger" class="text-right">
+                    <button onclick="toggleQuickAdd()"
+                        class="text-xs font-bold text-sky-400 hover:text-white uppercase tracking-wider transition-colors">
+                        + Quick Add Expense
+                    </button>
+                </div>
+                <div id="quickAddForm" class="hidden mt-2 flex flex-col gap-2 items-end">
+                    <input type="text" id="qaName" placeholder="Description"
+                        class="input-field w-full rounded p-2 text-right text-sm">
+                    <div class="flex gap-2 w-full justify-end">
+                        <input type="number" id="qaAmount" placeholder="$0.00"
+                            class="input-field w-24 rounded p-2 text-right text-sm">
+                        <button onclick="submitQuickAdd()"
+                            class="bg-red-500 text-white px-3 py-1 rounded text-sm font-bold shadow hover:bg-red-400">Add</button>
+                        <button onclick="toggleQuickAdd()" class="text-slate-500 hover:text-white px-2">✕</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN GRID -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- CHART SECTION (Span 2 Cols) -->
+        <div class="lg:col-span-2 card rounded-xl p-4 shadow-xl">
+            <div class="flex justify-between mb-4 items-center">
+                <div class="flex gap-4 items-center">
+                    <h3 class="text-lg font-semibold text-slate-200">Projection</h3>
+                    <!-- View Toggles -->
+                    <div class="flex bg-slate-700/50 rounded-lg p-1 gap-1">
+                        <button onclick="setChartView(1)" id="btn-1m"
+                            class="px-3 py-1 text-xs font-bold rounded text-slate-400 hover:bg-slate-600 hover:text-white transition-all">1M</button>
+                        <button onclick="setChartView(2)" id="btn-2m"
+                            class="px-3 py-1 text-xs font-bold rounded text-slate-400 hover:bg-slate-600 hover:text-white transition-all">2M</button>
+                        <button onclick="setChartView(3)" id="btn-3m"
+                            class="px-3 py-1 text-xs font-bold rounded text-slate-400 hover:bg-slate-600 hover:text-white transition-all">3M</button>
+                        <button onclick="setChartView(24)" id="btn-24m"
+                            class="px-3 py-1 text-xs font-bold rounded text-slate-400 hover:bg-slate-600 hover:text-white transition-all">All</button>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <!-- Legend Removed -->
+                </div>
+            </div>
+            <div class="h-[400px] w-full relative">
+                <canvas id="reserveChart"></canvas>
+            </div>
+
+            <!-- Upcoming List -->
+            <div class="mt-8 border-t border-slate-700 pt-4">
+                <h4 class="text-sm font-bold text-slate-400 mb-4">Upcoming 10 Days</h4>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm text-slate-300">
+                        <thead>
+                            <tr class="border-b border-slate-700 text-xs uppercase text-slate-500">
+                                <th class="pb-2">Date</th>
+                                <th class="pb-2">Net (+/-)</th>
+                                <th class="pb-2">Balance</th>
+                                <th class="pb-2">Events</th>
+                            </tr>
+                        </thead>
+                        <tbody id="upcomingTableBody">
+                            <!-- Rows injected here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- SIDEBAR: ADD LOG -->
+        <div class="space-y-6">
+
+            <!-- Add Log Form -->
+            <div class="card rounded-xl p-6 shadow-xl">
+                <h3 class="text-lg font-semibold text-sky-400 mb-4">Add Transaction</h3>
+                <form id="addLogForm" class="space-y-4">
+
+                    <!-- Transaction Type Toggle -->
+                    <div class="grid grid-cols-2 gap-2 bg-slate-700/50 p-1 rounded-lg mb-4">
+                        <label class="cursor-pointer">
+                            <input type="radio" name="txType" value="withdrawal" class="peer sr-only" checked
+                                onchange="updateTypeUI()">
+                            <div
+                                class="text-center py-2 rounded-md text-sm font-bold text-slate-400 peer-checked:bg-red-500 peer-checked:text-white peer-checked:shadow-lg transition-all">
+                                Expense
+                            </div>
+                        </label>
+                        <label class="cursor-pointer">
+                            <input type="radio" name="txType" value="paycheck" class="peer sr-only"
+                                onchange="updateTypeUI()">
+                            <div
+                                class="text-center py-2 rounded-md text-sm font-bold text-slate-400 peer-checked:bg-emerald-500 peer-checked:text-white peer-checked:shadow-lg transition-all">
+                                Paycheck
+                            </div>
+                        </label>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Date</label>
+                        <input type="date" id="date"
+                            class="input-field w-full rounded p-2 focus:ring-2 focus:ring-sky-500 outline-none"
+                            required>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Description</label>
+                        <input type="text" id="name" placeholder="e.g. Grocery Run"
+                            class="input-field w-full rounded p-2 focus:ring-2 focus:ring-sky-500 outline-none"
+                            required>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Amount</label>
+                            <input type="number" id="amount" placeholder="0.00" step="0.01" min="0"
+                                class="input-field w-full rounded p-2 focus:ring-2 focus:ring-sky-500 outline-none"
+                                required>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Frequency</label>
+                            <select id="frequency"
+                                class="input-field w-full rounded p-2 focus:ring-2 focus:ring-sky-500 outline-none">
+                                <option value="one-time">One-Time</option>
+                                <option value="weekly">Weekly</option>
+                                <option value="bi-weekly">Bi-Weekly</option>
+                                <option value="monthly">Monthly (Same Date)</option>
+                                <option value="every-4-weeks">Every 4 Weeks</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Limit Field -->
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Limit (Optional)</label>
+                        <input type="number" id="limit" placeholder="e.g. 6 payments left" min="1"
+                            class="input-field w-full rounded p-2 focus:ring-2 focus:ring-sky-500 outline-none">
+                        <p class="text-[10px] text-slate-500 mt-1">Leave empty for indefinite.</p>
+                    </div>
+
+                    <button type="submit" id="submitBtn"
+                        class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded transition-all mt-2 shadow-lg hover:shadow-red-500/20">
+                        Add Expense
+                    </button>
+                </form>
+            </div>
+
+            <!-- Mini Stats -->
+            <div class="card rounded-xl p-6 shadow-xl">
+                <h3 class="text-sm font-semibold text-slate-400 mb-2">Insight</h3>
+                <p id="insightText" class="text-sm text-slate-300">
+                    Loading insights...
+                </p>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- LOGIC -->
+    <script>
+        let chartInstance = null;
+        let fullTimelineData = []; // Store full 24-month data
+        let currentViewMonths = 3; // Default view
+        let projectedTodayBalance = 0; // Capture for sync functionality
+
+        // Initialize
+        window.onload = function () {
+            // Set default date to today using local timezone
+            // Note: Using value instead of valueAsDate to avoid timezone issues
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            document.getElementById('date').value = `${yyyy}-${mm}-${dd}`;
+            loadData();
+        };
+
+        // Load Data from Backend
+        function loadData() {
+            google.script.run
+                .withSuccessHandler(renderDashboard)
+                .withFailureHandler(showError)
+                .getForecastData();
+        }
+
+        function renderDashboard(data) {
+            if (!data || data.error) {
+                showError(data ? data.error : 'Unknown error');
+                return;
+            }
+
+            // 1. Update Header Balance
+            // Logic: Show projected balance for TODAY. Fallback to startBalance if today not found.
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            const todayStr = `${yyyy}-${mm}-${dd}`;
+
+            const todayEntry = data.timeline.find(d => d.date === todayStr);
+            const displayBalance = todayEntry ? todayEntry.balance : data.startBalance;
+            projectedTodayBalance = displayBalance; // Store for sync
+
+            document.getElementById('currentBalance').innerText = formatMoney(displayBalance);
+            document.getElementById('anchorDate').innerText = data.anchorDate || '—';
+
+            // 2. Store Data & Render Default View
+            fullTimelineData = data.timeline;
+            setChartView(currentViewMonths); // Initial render
+            renderUpcoming(data.timeline);   // <--- Render Table
+
+            // 3. Simple Insight
+            const minVal = Math.min(...data.timeline.map(d => d.balance));
+            const minDate = data.timeline.find(d => d.balance === minVal).date;
+            document.getElementById('insightText').innerHTML = `
+          Lowest projected balance is <span class="text-red-400 font-bold">${formatMoney(minVal)}</span> on ${minDate}.
+        `;
+        }
+
+        function renderChart(timeline) {
+            const ctx = document.getElementById('reserveChart').getContext('2d');
+
+            // Prepare Data
+            const labels = timeline.map(d => d.date);
+            const dataPoints = timeline.map(d => d.balance);
+
+            // Gradient Fill
+            const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+            gradient.addColorStop(0, 'rgba(14, 165, 233, 0.5)'); // Sky-500
+            gradient.addColorStop(1, 'rgba(14, 165, 233, 0.0)');
+
+            // Destroy old chart if exists
+            if (chartInstance) chartInstance.destroy();
+
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Reserve Balance',
+                        data: dataPoints,
+                        borderColor: '#0ea5e9', // Sky-500
+                        backgroundColor: gradient,
+                        borderWidth: 2,
+                        pointRadius: 0, // Clean look
+                        pointHoverRadius: 4,
+                        fill: true,
+                        tension: 0.1 // Slight curve
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: { unit: 'month' },
+                            grid: { color: '#334155' },
+                            ticks: { color: '#94a3b8' }
+                        },
+                        y: {
+                            grid: { color: '#334155' },
+                            ticks: { color: '#94a3b8' }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            backgroundColor: '#1e293b',
+                            titleColor: '#e2e8f0',
+                            bodyColor: '#e2e8f0',
+                            borderColor: '#475569',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function (context) {
+                                    return 'Balance: ' + formatMoney(context.parsed.y);
+                                },
+                                afterBody: function (context) {
+                                    const dataIndex = context[0].dataIndex;
+                                    const events = timeline[dataIndex].events;
+                                    return events ? '\nEvents: ' + events : '';
+                                }
+                            }
+                        },
+                        annotation: {
+                            annotations: {
+                                line1: {
+                                    type: 'line',
+                                    yMin: 1000,
+                                    yMax: 1000,
+                                    borderColor: 'rgb(239, 68, 68)', // Red-500
+                                    borderWidth: 1,
+                                    borderDash: [5, 5],
+                                    label: {
+                                        content: 'Danger Zone',
+                                        enabled: true,
+                                        position: 'start'
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function setChartView(months) {
+            currentViewMonths = months;
+
+            // Update Buttons
+            ['1m', '2m', '3m', '24m'].forEach(k => {
+                const btn = document.getElementById(`btn-${k}`);
+                if (parseInt(k) === months) {
+                    btn.classList.add('bg-sky-500', 'text-white', 'shadow-lg');
+                    btn.classList.remove('text-slate-400', 'hover:bg-slate-600');
+                } else {
+                    btn.classList.remove('bg-sky-500', 'text-white', 'shadow-lg');
+                    btn.classList.add('text-slate-400', 'hover:bg-slate-600');
+                }
+            });
+
+            // Filter Data
+            // Assuming fullTimelineData is daily, we just slice approx 30 days * months
+            // Accurate way: Filter by date
+            if (!fullTimelineData.length) return;
+
+            const startDate = new Date(fullTimelineData[0].date);
+            const endDate = new Date(startDate);
+            endDate.setMonth(endDate.getMonth() + months);
+
+            const filteredData = fullTimelineData.filter(d => {
+                const currentDate = new Date(d.date);
+                return currentDate <= endDate;
+            });
+
+            renderChart(filteredData);
+        }
+
+        function renderUpcoming(timeline) {
+            const tableBody = document.getElementById('upcomingTableBody');
+            tableBody.innerHTML = ''; // Clear
+
+            // Take next 10 days
+            const upcoming = timeline.slice(0, 10);
+
+            upcoming.forEach(day => {
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-slate-800/50 hover:bg-slate-800/50 transition-colors';
+
+                // Format Net Change color
+                const netClass = day.net > 0 ? 'text-emerald-400' : (day.net < 0 ? 'text-red-400' : 'text-slate-500');
+                const netSign = day.net > 0 ? '+' : '';
+
+                tr.innerHTML = `
+                    <td class="py-3 font-mono text-slate-400">${day.date}</td>
+                    <td class="py-3 font-mono ${netClass}">${netSign}${formatMoney(day.net)}</td>
+                    <td class="py-3 font-mono font-bold text-white">${formatMoney(day.balance)}</td>
+                    <td class="py-3 text-slate-400 text-xs">${day.events || '-'}</td>
+                `;
+                tableBody.appendChild(tr);
+            });
+        }
+
+        // Type UI Toggle Logic
+        function updateTypeUI() {
+            const type = document.querySelector('input[name="txType"]:checked').value;
+            const btn = document.getElementById('submitBtn');
+            const nameInput = document.getElementById('name');
+
+            if (type === 'paycheck') {
+                btn.innerText = 'Add Paycheck';
+                btn.className = "w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded transition-all mt-2 shadow-lg hover:shadow-emerald-500/20";
+                nameInput.placeholder = "e.g. Work Paycheck";
+            } else {
+                btn.innerText = 'Add Expense';
+                btn.className = "w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded transition-all mt-2 shadow-lg hover:shadow-red-500/20";
+                nameInput.placeholder = "e.g. Grocery Run";
+            }
+        }
+
+        // Add Transaction Handler
+        document.getElementById('addLogForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const btn = document.getElementById('submitBtn');
+            const originalText = btn.innerText;
+            btn.disabled = true;
+            btn.innerText = 'adding...';
+
+            const formData = {
+                date: document.getElementById('date').value,
+                name: document.getElementById('name').value,
+                amount: document.getElementById('amount').value,
+                frequency: document.getElementById('frequency').value,
+                limit: document.getElementById('limit').value, // <--- Added Limit here
+                type: document.querySelector('input[name="txType"]:checked').value
+            };
+
+            google.script.run
+                .withSuccessHandler((res) => {
+                    btn.disabled = false;
+                    btn.innerText = originalText;
+                    if (res.success) {
+                        // Reset form but keep date? Or reset all
+                        // Keeping date is usually nicer for batch entry of same day
+                        const currentType = document.querySelector('input[name="txType"]:checked').value;
+                        document.getElementById('name').value = '';
+                        document.getElementById('amount').value = '';
+                        document.getElementById('limit').value = ''; // <--- Reset Limit
+                        // Don't reset freq or type as user might be adding multiple similar
+                        loadData();
+                    } else {
+                        alert('Error: ' + res.error);
+                    }
+                })
+                .withFailureHandler((err) => {
+                    btn.disabled = false;
+                    btn.innerText = originalText;
+                    alert('Network Error: ' + err);
+                })
+                .addTransactionAPI(formData);
+        });
+
+        // Utils
+        function formatMoney(amount) {
+            return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+        }
+
+        function toggleEditBalance() {
+            const form = document.getElementById('editBalanceForm');
+            form.classList.toggle('hidden');
+            if (!form.classList.contains('hidden')) {
+                document.getElementById('newBalanceInput').focus();
+            }
+        }
+
+        function saveBalance() {
+            const val = document.getElementById('newBalanceInput').value;
+            if (!val) return;
+
+            const btn = event.target; // The save button
+            btn.innerText = '...';
+            btn.disabled = true;
+
+            google.script.run
+                .withSuccessHandler((res) => {
+                    btn.innerText = 'Save';
+                    btn.disabled = false;
+                    if (res.success) {
+                        toggleEditBalance();
+                        loadData(); // Refresh everything
+                    } else {
+                        alert('Error: ' + res.error);
+                    }
+                })
+                .withFailureHandler(showError)
+                .updateBalanceAPI(val);
+        }
+
+        // --- QUICK ADD LOGIC ---
+        function toggleQuickAdd() {
+            const trigger = document.getElementById('quickAddTrigger');
+            const form = document.getElementById('quickAddForm');
+            const isHidden = form.classList.contains('hidden');
+
+            if (isHidden) {
+                form.classList.remove('hidden');
+                trigger.classList.add('hidden');
+                document.getElementById('qaAmount').focus();
+            } else {
+                form.classList.add('hidden');
+                trigger.classList.remove('hidden');
+            }
+        }
+
+        function submitQuickAdd() {
+            const amount = document.getElementById('qaAmount').value;
+            const name = document.getElementById('qaName').value;
+
+            if (!amount) return;
+
+            const btn = event.target;
+            const originalText = btn.innerText;
+            btn.innerText = '...';
+            btn.disabled = true;
+
+            // Date = Today
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            const dateStr = `${yyyy}-${mm}-${dd}`;
+
+            const formData = {
+                date: dateStr,
+                name: name || 'Quick Expense',
+                amount: amount,
+                frequency: 'one-time',
+                type: 'withdrawal'
+            };
+
+            google.script.run
+                .withSuccessHandler((res) => {
+                    btn.innerText = originalText;
+                    btn.disabled = false;
+                    if (res.success) {
+                        // Reset and Hide
+                        document.getElementById('qaAmount').value = '';
+                        document.getElementById('qaName').value = '';
+                        toggleQuickAdd();
+                        loadData(); // Refresh chart/list
+                    } else {
+                        alert('Error: ' + res.error);
+                    }
+                })
+                .withFailureHandler((err) => {
+                    btn.innerText = originalText;
+                    btn.disabled = false;
+                    showError(err);
+                })
+                .addTransactionAPI(formData);
+        }
+
+        function syncAnchorToToday() {
+            if (!confirm(`Set the anchor to today? This will lock in your current projected balance of ${formatMoney(projectedTodayBalance)} as the new baseline.`)) return;
+
+            google.script.run
+                .withSuccessHandler((res) => {
+                    if (res.success) {
+                        loadData(); // Refresh to show new anchor date
+                    } else {
+                        alert('Error: ' + res.error);
+                    }
+                })
+                .withFailureHandler(showError)
+                .syncAnchorToTodayAPI(projectedTodayBalance);
+        }
+
+        function showError(msg) {
+            console.error(msg);
+            alert('Something went wrong: ' + msg);
+        }
+    </script>
+</body>
+
+</html>

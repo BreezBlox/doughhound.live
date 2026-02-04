@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <base target="_top">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #0f172a;
+            color: #e2e8f0;
+        }
+
+        .input-field {
+            background-color: #334155;
+            border-color: #475569;
+            color: white;
+        }
+    </style>
+</head>
+
+<body class="p-4">
+    <h3 class="text-lg font-semibold text-sky-400 mb-4">Add Transaction</h3>
+
+    <form id="addLogForm" class="space-y-4">
+        <!-- Transaction Type Toggle -->
+        <div class="grid grid-cols-2 gap-2 bg-slate-700/50 p-1 rounded-lg mb-4">
+            <label class="cursor-pointer">
+                <input type="radio" name="txType" value="withdrawal" class="peer sr-only" checked
+                    onchange="updateTypeUI()">
+                <div
+                    class="text-center py-2 rounded-md text-sm font-bold text-slate-400 peer-checked:bg-red-500 peer-checked:text-white peer-checked:shadow-lg transition-all">
+                    Expense
+                </div>
+            </label>
+            <label class="cursor-pointer">
+                <input type="radio" name="txType" value="paycheck" class="peer sr-only" onchange="updateTypeUI()">
+                <div
+                    class="text-center py-2 rounded-md text-sm font-bold text-slate-400 peer-checked:bg-emerald-500 peer-checked:text-white peer-checked:shadow-lg transition-all">
+                    Paycheck
+                </div>
+            </label>
+        </div>
+
+        <div>
+            <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Date</label>
+            <input type="date" id="date"
+                class="input-field w-full rounded p-2 focus:ring-2 focus:ring-sky-500 outline-none" required>
+        </div>
+
+        <div>
+            <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Description</label>
+            <input type="text" id="name" placeholder="e.g. Grocery Run"
+                class="input-field w-full rounded p-2 focus:ring-2 focus:ring-sky-500 outline-none" required>
+        </div>
+
+        <div>
+            <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Amount</label>
+            <input type="number" id="amount" placeholder="0.00" step="0.01" min="0"
+                class="input-field w-full rounded p-2 focus:ring-2 focus:ring-sky-500 outline-none" required>
+        </div>
+
+        <div>
+            <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Frequency</label>
+            <select id="frequency" class="input-field w-full rounded p-2 focus:ring-2 focus:ring-sky-500 outline-none">
+                <option value="one-time">One-Time</option>
+                <option value="weekly">Weekly</option>
+                <option value="bi-weekly">Bi-Weekly</option>
+                <option value="monthly">Monthly (Same Date)</option>
+                <option value="every-4-weeks">Every 4 Weeks</option>
+            </select>
+        </div>
+
+        <!-- Limit Field -->
+        <div>
+            <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Limit (Optional)</label>
+            <input type="number" id="limit" placeholder="e.g. 6 payments left" min="1"
+                class="input-field w-full rounded p-2 focus:ring-2 focus:ring-sky-500 outline-none">
+            <p class="text-[10px] text-slate-500 mt-1">Leave empty for indefinite.</p>
+        </div>
+
+        <button type="submit" id="submitBtn"
+            class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded transition-all mt-6 shadow-lg hover:shadow-red-500/20">
+            Add Expense
+        </button>
+    </form>
+
+    <div id="status" class="mt-4 text-xs text-center text-slate-400 hidden"></div>
+
+    <script>
+        window.onload = function () {
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            document.getElementById('date').value = `${yyyy}-${mm}-${dd}`;
+        };
+
+        function updateTypeUI() {
+            const type = document.querySelector('input[name="txType"]:checked').value;
+            const btn = document.getElementById('submitBtn');
+            const nameInput = document.getElementById('name');
+
+            if (type === 'paycheck') {
+                btn.innerText = 'Add Paycheck';
+                btn.className = "w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded transition-all mt-6 shadow-lg hover:shadow-emerald-500/20";
+                nameInput.placeholder = "e.g. Work Paycheck";
+            } else {
+                btn.innerText = 'Add Expense';
+                btn.className = "w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded transition-all mt-6 shadow-lg hover:shadow-red-500/20";
+                nameInput.placeholder = "e.g. Grocery Run";
+            }
+        }
+
+        document.getElementById('addLogForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const btn = document.getElementById('submitBtn');
+            const status = document.getElementById('status');
+
+            const originalText = btn.innerText;
+            btn.disabled = true;
+            btn.innerText = 'Adding...';
+            status.classList.add('hidden');
+
+            const formData = {
+                date: document.getElementById('date').value,
+                name: document.getElementById('name').value,
+                amount: document.getElementById('amount').value,
+                frequency: document.getElementById('frequency').value,
+                limit: document.getElementById('limit').value,
+                type: document.querySelector('input[name="txType"]:checked').value
+            };
+
+            google.script.run
+                .withSuccessHandler(function (res) {
+                    btn.disabled = false;
+                    btn.innerText = originalText;
+                    if (res.success) {
+                        document.getElementById('name').value = '';
+                        document.getElementById('amount').value = '';
+                        document.getElementById('limit').value = '';
+                        status.innerText = "Transaction added!";
+                        status.classList.remove('hidden');
+                        setTimeout(() => status.classList.add('hidden'), 3000);
+                    } else {
+                        status.innerText = "Error: " + res.error;
+                        status.classList.remove('hidden');
+                    }
+                })
+                .withFailureHandler(function (err) {
+                    btn.disabled = false;
+                    btn.innerText = originalText;
+                    status.innerText = "Error: " + err;
+                    status.classList.remove('hidden');
+                })
+                .addTransactionAPI(formData);
+        });
+    </script>
+</body>
+
+</html>
