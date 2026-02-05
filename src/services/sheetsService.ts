@@ -319,6 +319,8 @@ export async function testSheetAccess(config: SheetsServiceConfig): Promise<bool
         );
 
         return response.ok;
+    } catch {
+        return false;
     }
 }
 

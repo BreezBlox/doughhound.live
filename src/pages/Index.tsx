@@ -13,14 +13,18 @@ import OnboardingDialog from "@/components/OnboardingDialog";
 import OnboardingHint from "@/components/ui/OnboardingHint";
 import SheetSetup from "@/components/SheetSetup";
 import { useAuth } from "@/auth/AuthContext";
-import { FinancialEntry, EntryType, DailyReserve } from "@/types";
-import { calculateRecurringEntries, calculateDailyReserves, formatDateToMonthDayYear, formatDateToYYYYMMDD } from "@/utils/dateUtils";
+import { FinancialEntry, EntryType, DailyReserve, DashboardConfig } from "@/types";
+import { calculateRecurringEntries, calculateDailyReserves, formatDateToMonthDayYear, formatDateToYYYYMMDD, parseLocalDateString } from "@/utils/dateUtils";
 import { v4 as uuidv4 } from "uuid";
 import * as sheetsService from "@/services/sheetsService";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { OpsCard } from "@/components/ui/OpsCard";
 import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 
 const Index = () => {
   const { user, accessToken, logout } = useAuth();
@@ -34,6 +38,11 @@ const Index = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [selectedMonths, setSelectedMonths] = useState<number[]>([new Date().getMonth()]);
 
+  // Dashboard Sync State
+  const [dashboardConfig, setDashboardConfig] = useState<DashboardConfig>({ startDate: null, startBalance: 0 });
+  const [showReconcileDialog, setShowReconcileDialog] = useState(false);
+  const [reconcileBalance, setReconcileBalance] = useState<string>("");
+
   const toggleVisibility = (id: string) => {
     setHiddenIds((prev) => prev.includes(id) ? prev.filter(hid => hid !== id) : [...prev, id]);
   };
@@ -41,16 +50,33 @@ const Index = () => {
   // Calculate reserves when entries or selectedDate change
   const visibleEntries = entries.filter(e => !hiddenIds.includes(e.id));
 
+  // Main Calculation Effect
   useEffect(() => {
-    // Always show 24 months of data, but start from the earliest entry date for true running balance
-    let minEntryDate = visibleEntries.length > 0 ? visibleEntries.reduce((min, e) => e.date < min ? e.date : min, visibleEntries[0].date) : new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
-    minEntryDate = new Date(minEntryDate.getFullYear(), minEntryDate.getMonth(), 1); // snap to first of month
+    // Determine start date: Use Dashboard Config Start Date if available, else fallback to first entry or selected date
+    let calculationStartDate: Date;
+
+    if (dashboardConfig.startDate) {
+      calculationStartDate = new Date(dashboardConfig.startDate);
+    } else {
+      calculationStartDate = visibleEntries.length > 0
+        ? visibleEntries.reduce((min, e) => e.date < min ? e.date : min, visibleEntries[0].date)
+        : new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+      calculationStartDate = new Date(calculationStartDate.getFullYear(), calculationStartDate.getMonth(), 1);
+    }
+
     const endDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 24, 0); // 24 months ahead
 
-    const recurringEntries = calculateRecurringEntries(visibleEntries, minEntryDate, endDate);
-    const dailyReserves = calculateDailyReserves(recurringEntries, minEntryDate, endDate);
+    const recurringEntries = calculateRecurringEntries(visibleEntries, calculationStartDate, endDate);
+    const dailyReservesRaw = calculateDailyReserves(recurringEntries, calculationStartDate, endDate);
+
+    // Apply Start Balance Offset
+    const dailyReserves = dailyReservesRaw.map(dr => ({
+      ...dr,
+      reserve: dr.reserve + (dashboardConfig.startBalance || 0)
+    }));
+
     setReserves(dailyReserves);
-  }, [entries, selectedDate, hiddenIds]);
+  }, [entries, selectedDate, hiddenIds, dashboardConfig]);
 
   // Handle form submission
   const handleEntrySubmit = async (newEntry: Omit<FinancialEntry, 'id'>) => {
@@ -60,7 +86,6 @@ const Index = () => {
     };
     setEntries(prevEntries => [...prevEntries, entryWithId]);
 
-    // Save to Google Sheets
     if (user?.sheetId && accessToken) {
       setIsSaving(true);
       await sheetsService.saveEntry({ accessToken, sheetId: user.sheetId }, entryWithId);
@@ -96,20 +121,22 @@ const Index = () => {
 
   const handleCancelEdit = () => setEditingEntry(null);
 
-
-  // Load entries from Google Sheets on mount
+  // Load entries & dashboard config from Google Sheets on mount
   useEffect(() => {
-    const loadEntries = async () => {
+    const loadData = async () => {
       if (user?.sheetId && accessToken) {
         setIsLoadingData(true);
         try {
-          const loadedEntries = await sheetsService.fetchEntries({
-            accessToken,
-            sheetId: user.sheetId,
-          });
+          // Parallel fetch
+          const [loadedEntries, loadedConfig] = await Promise.all([
+            sheetsService.fetchEntries({ accessToken, sheetId: user.sheetId }),
+            sheetsService.fetchDashboardSettings({ accessToken, sheetId: user.sheetId })
+          ]);
+
           setEntries(loadedEntries);
+          setDashboardConfig(loadedConfig);
         } catch (error) {
-          console.error('Failed to load entries:', error);
+          console.error('Failed to load data:', error);
         } finally {
           setIsLoadingData(false);
         }
@@ -117,8 +144,25 @@ const Index = () => {
         setIsLoadingData(false);
       }
     };
-    loadEntries();
+    loadData();
   }, [user?.sheetId, accessToken]);
+
+  const handleReconcile = async () => {
+    const newBalance = parseFloat(reconcileBalance);
+    if (isNaN(newBalance)) return;
+
+    const newConfig: DashboardConfig = {
+      startDate: new Date(), // Anchor to today
+      startBalance: newBalance
+    };
+
+    setDashboardConfig(newConfig);
+    setShowReconcileDialog(false);
+
+    if (user?.sheetId && accessToken) {
+      await sheetsService.updateDashboardSettings({ accessToken, sheetId: user.sheetId }, newConfig);
+    }
+  };
 
   // If user hasn't linked a sheet yet, show setup
   if (!user?.sheetId) {
@@ -180,9 +224,12 @@ const Index = () => {
                 subtitle={`CLIENT: ${user.name.toUpperCase()} // FOCUS: FINANCIAL FORECAST + RUNWAY`}
                 className="flex-1 flex flex-col"
               >
-                <div className="flex gap-8 mb-8 border-b border-border/50 pb-8">
+                <div className="flex gap-8 mb-8 border-b border-border/50 pb-8 relative group/balance">
                   <div>
-                    <span className="font-mono text-xs text-muted-foreground tracking-widest block mb-1">CURRENT BALANCE</span>
+                    <span className="font-mono text-xs text-muted-foreground tracking-widest block mb-1">
+                      CURRENT BALANCE
+                      <span className="ml-2 text-[10px] text-primary cursor-pointer hover:underline" onClick={() => setShowReconcileDialog(true)}>[SYNC]</span>
+                    </span>
                     <span className="font-orbitron text-4xl text-primary font-bold">
                       ${reserves.length > 0 ? reserves[0].reserve.toFixed(2) : '0.00'}
                     </span>
@@ -241,7 +288,6 @@ const Index = () => {
 
             {/* Right Column: Next Up & Daily Loop */}
             <div className="flex flex-col gap-6">
-
               {/* Next Up (Intel Input) */}
               <OpsCard title="INTEL INPUT" subtitle="LOG ACQUISITION / EXPENDITURE" className="h-auto">
                 <div className="flex justify-between items-center mb-4">
@@ -310,6 +356,36 @@ const Index = () => {
 
         </div>
       </SidebarInset>
+
+      {/* Reconcile Dialog */}
+      <Dialog open={showReconcileDialog} onOpenChange={setShowReconcileDialog}>
+        <DialogContent className="bg-card border-primary/20 text-foreground font-mono">
+          <DialogHeader>
+            <DialogTitle className="font-orbitron text-primary">SYNC ANCHOR POINT</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <p className="text-xs text-muted-foreground">
+              Set the actual bank balance for TODAY ({formatDateToMonthDayYear(new Date())}).
+              This will anchor your forecast from this point forward.
+            </p>
+            <div className="grid w-full items-center gap-1.5">
+              <Label htmlFor="balance">Create Reserve Balance</Label>
+              <Input
+                id="balance"
+                type="number"
+                placeholder="0.00"
+                value={reconcileBalance}
+                onChange={(e) => setReconcileBalance(e.target.value)}
+                className="font-mono text-lg border-primary/50 focus:ring-primary"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowReconcileDialog(false)} className="border-destructive/50 text-destructive hover:bg-destructive/10">CANCEL</Button>
+            <Button onClick={handleReconcile} className="bg-primary text-background hover:bg-primary/90 font-orbitron">SYNC & LOCK</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </SidebarProvider>
   );
 };
