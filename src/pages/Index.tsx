@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import LineGraph, { IntervalType } from "@/components/LineGraph";
 import { MONTH_OPTIONS } from "@/utils/monthOptions";
 import { useAuth } from "@/auth/AuthContext";
@@ -22,7 +23,7 @@ import OnboardingDialog from "@/components/OnboardingDialog";
 import SheetSetup from "@/components/SheetSetup";
 
 const Index = () => {
-  const { user, accessToken } = useAuth();
+  const { user, accessToken, logout } = useAuth();
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   // Data State
@@ -119,7 +120,16 @@ const Index = () => {
     setShowReconcileDialog(false);
 
     if (user?.sheetId && accessToken) {
-      await sheetsService.updateDashboardSettings({ accessToken, sheetId: user.sheetId }, newConfig);
+      try {
+        await sheetsService.updateDashboardSettings({ accessToken, sheetId: user.sheetId }, newConfig);
+      } catch (error) {
+        if (error instanceof sheetsService.AuthError) {
+          toast.error("Session expired");
+          logout();
+        } else {
+          toast.error("Failed to sync settings");
+        }
+      }
     }
   };
 
@@ -145,8 +155,27 @@ const Index = () => {
     // Persist
     if (user?.sheetId && accessToken) {
       setIsSaving(true);
-      await sheetsService.saveEntry({ accessToken, sheetId: user.sheetId }, newEntry);
-      setIsSaving(false);
+      try {
+        const success = await sheetsService.saveEntry({ accessToken, sheetId: user.sheetId }, newEntry);
+        if (!success) {
+          // Rollback on generic failure
+          setEntries(prev => prev.filter(e => e.id !== newEntry.id));
+          toast.error("Failed to save transaction");
+        }
+      } catch (error) {
+        // Rollback on error
+        setEntries(prev => prev.filter(e => e.id !== newEntry.id));
+
+        if (error instanceof sheetsService.AuthError) {
+          toast.error("Session expired. Please login again.");
+          logout();
+        } else {
+          console.error("Save error:", error);
+          toast.error("Failed to save transaction");
+        }
+      } finally {
+        setIsSaving(false);
+      }
     }
   };
 
@@ -188,17 +217,63 @@ const Index = () => {
   const handleEditEntry = (entry: FinancialEntry) => setEditingEntry(entry);
   const handleCancelEdit = () => setEditingEntry(null);
   const handleSaveEdit = async (updated: FinancialEntry) => {
+    const originalEntry = entries.find(e => e.id === updated.id);
+
+    // Optimistic update
     setEntries(prev => prev.map(e => e.id === updated.id ? updated : e));
     setEditingEntry(null);
+
     if (user?.sheetId && accessToken) {
-      await sheetsService.updateEntry({ accessToken, sheetId: user.sheetId }, updated);
+      try {
+        const success = await sheetsService.updateEntry({ accessToken, sheetId: user.sheetId }, updated);
+        if (!success && originalEntry) {
+          // Rollback
+          setEntries(prev => prev.map(e => e.id === updated.id ? originalEntry : e));
+          toast.error("Failed to update transaction");
+        }
+      } catch (error) {
+        // Rollback
+        if (originalEntry) {
+          setEntries(prev => prev.map(e => e.id === updated.id ? originalEntry : e));
+        }
+
+        if (error instanceof sheetsService.AuthError) {
+          toast.error("Session expired. Please login again.");
+          logout();
+        } else {
+          toast.error("Failed to update transaction");
+        }
+      }
     }
   };
   const handleDeleteEntry = async (id: string) => {
+    const entryToDelete = entries.find(e => e.id === id);
+
+    // Optimistic delete
     setEntries(prevEntries => prevEntries.filter(entry => entry.id !== id));
     if (editingEntry && editingEntry.id === id) setEditingEntry(null);
+
     if (user?.sheetId && accessToken) {
-      await sheetsService.deleteEntry({ accessToken, sheetId: user.sheetId }, id);
+      try {
+        const success = await sheetsService.deleteEntry({ accessToken, sheetId: user.sheetId }, id);
+        if (!success && entryToDelete) {
+          // Rollback
+          setEntries(prev => [...prev, entryToDelete]);
+          toast.error("Failed to delete transaction");
+        }
+      } catch (error) {
+        // Rollback
+        if (entryToDelete) {
+          setEntries(prev => [...prev, entryToDelete]);
+        }
+
+        if (error instanceof sheetsService.AuthError) {
+          toast.error("Session expired. Please login again.");
+          logout();
+        } else {
+          toast.error("Failed to delete transaction");
+        }
+      }
     }
   };
 

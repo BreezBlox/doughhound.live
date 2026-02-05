@@ -82,6 +82,14 @@ export async function initializeSheet(config: SheetsServiceConfig): Promise<bool
     }
 }
 
+// Custom error for authentication issues
+export class AuthError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'AuthError';
+    }
+}
+
 /**
  * Fetch all entries from the Google Sheet
  */
@@ -97,6 +105,10 @@ export async function fetchEntries(config: SheetsServiceConfig): Promise<Financi
                 },
             }
         );
+
+        if (response.status === 401 || response.status === 403) {
+            throw new AuthError('Session expired or unauthorized');
+        }
 
         if (!response.ok) {
             console.error('Failed to fetch entries:', await response.text());
@@ -122,6 +134,7 @@ export async function fetchEntries(config: SheetsServiceConfig): Promise<Financi
             customDates: row[8] ? JSON.parse(row[8]) : undefined,
         }));
     } catch (error) {
+        if (error instanceof AuthError) throw error;
         console.error('Error fetching entries:', error);
         return [];
     }
@@ -160,6 +173,10 @@ export async function saveEntry(config: SheetsServiceConfig, entry: FinancialEnt
             }
         );
 
+        if (response.status === 401 || response.status === 403) {
+            throw new AuthError('Session expired or unauthorized');
+        }
+
         if (!response.ok) {
             console.error('Failed to save entry:', await response.text());
             return false;
@@ -167,6 +184,7 @@ export async function saveEntry(config: SheetsServiceConfig, entry: FinancialEnt
 
         return true;
     } catch (error) {
+        if (error instanceof AuthError) throw error;
         console.error('Error saving entry:', error);
         return false;
     }
@@ -188,6 +206,10 @@ export async function deleteEntry(config: SheetsServiceConfig, entryId: string):
                 },
             }
         );
+
+        if (response.status === 401 || response.status === 403) {
+            throw new AuthError('Session expired or unauthorized');
+        }
 
         if (!response.ok) {
             console.error('Failed to find entry:', await response.text());
@@ -217,6 +239,10 @@ export async function deleteEntry(config: SheetsServiceConfig, entryId: string):
             }
         );
 
+        if (clearResponse.status === 401 || clearResponse.status === 403) {
+            throw new AuthError('Session expired or unauthorized');
+        }
+
         if (!clearResponse.ok) {
             console.error('Failed to delete entry:', await clearResponse.text());
             return false;
@@ -224,6 +250,7 @@ export async function deleteEntry(config: SheetsServiceConfig, entryId: string):
 
         return true;
     } catch (error) {
+        if (error instanceof AuthError) throw error;
         console.error('Error deleting entry:', error);
         return false;
     }
@@ -246,16 +273,20 @@ export async function updateEntry(config: SheetsServiceConfig, entry: FinancialE
             }
         );
 
+        if (response.status === 401 || response.status === 403) {
+            throw new AuthError('Session expired or unauthorized');
+        }
+
         if (!response.ok) {
             console.error('Failed to find entry:', await response.text());
             return false;
         }
 
         const data = await response.json();
-        const rows = data.values || [];
+        const values = data.values || [];
 
         // Find the row index
-        const rowIndex = rows.findIndex((row: string[]) => row[0] === entry.id);
+        const rowIndex = values.findIndex((row: string[]) => row[0] === entry.id);
 
         if (rowIndex === -1) {
             console.error('Entry not found for update:', entry.id);
@@ -290,6 +321,10 @@ export async function updateEntry(config: SheetsServiceConfig, entry: FinancialE
             }
         );
 
+        if (updateResponse.status === 401 || updateResponse.status === 403) {
+            throw new AuthError('Session expired or unauthorized');
+        }
+
         if (!updateResponse.ok) {
             console.error('Failed to update entry:', await updateResponse.text());
             return false;
@@ -297,6 +332,7 @@ export async function updateEntry(config: SheetsServiceConfig, entry: FinancialE
 
         return true;
     } catch (error) {
+        if (error instanceof AuthError) throw error;
         console.error('Error updating entry:', error);
         return false;
     }
@@ -341,6 +377,10 @@ export async function fetchDashboardSettings(config: SheetsServiceConfig): Promi
             }
         );
 
+        if (response.status === 401 || response.status === 403) {
+            throw new AuthError('Session expired or unauthorized');
+        }
+
         if (!response.ok) {
             return { startDate: null, startBalance: 0 };
         }
@@ -364,6 +404,7 @@ export async function fetchDashboardSettings(config: SheetsServiceConfig): Promi
 
         return { startDate, startBalance };
     } catch (error) {
+        if (error instanceof AuthError) throw error;
         console.error('Error fetching dashboard settings:', error);
         return { startDate: null, startBalance: 0 };
     }

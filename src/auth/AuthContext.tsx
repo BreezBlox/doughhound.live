@@ -55,17 +55,32 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const savedUser = localStorage.getItem(USER_STORAGE_KEY);
     const savedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
 
-    if (savedUser && savedToken) {
-      try {
-        setUser(JSON.parse(savedUser));
-        setAccessToken(savedToken);
-      } catch (e) {
-        console.error('Failed to parse saved user:', e);
-        localStorage.removeItem(USER_STORAGE_KEY);
-        localStorage.removeItem(TOKEN_STORAGE_KEY);
+    const validateAndLoad = async () => {
+      if (savedUser && savedToken) {
+        try {
+          // Verify token validity
+          const response = await fetch(`https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=${savedToken}`);
+
+          if (!response.ok) {
+            console.warn('Saved token is invalid or expired');
+            throw new Error('Token expired');
+          }
+
+          setUser(JSON.parse(savedUser));
+          setAccessToken(savedToken);
+        } catch (e) {
+          console.error('Failed to restore session:', e);
+          // Clear invalid session
+          localStorage.removeItem(USER_STORAGE_KEY);
+          localStorage.removeItem(TOKEN_STORAGE_KEY);
+          setUser(null);
+          setAccessToken(null);
+        }
       }
-    }
-    setIsLoading(false);
+      setIsLoading(false);
+    };
+
+    validateAndLoad();
   }, []);
 
   const login = async (token: string) => {
