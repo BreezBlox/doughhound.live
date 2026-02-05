@@ -3,6 +3,9 @@ import { FinancialEntry, DashboardConfig } from '@/types';
 // Google Sheets API base URL
 const SHEETS_API_BASE = 'https://sheets.googleapis.com/v4/spreadsheets';
 
+const SHEET_NAME = 'Transactions';
+const DASHBOARD_SHEET_NAME = 'Dashboard';
+
 // Sheet structure: Header row + data rows
 const HEADERS = ['id', 'type', 'name', 'amount', 'date', 'frequency', 'occurrenceLimit', 'stopDate', 'customDates'];
 
@@ -29,9 +32,9 @@ export async function initializeSheet(config: SheetsServiceConfig): Promise<bool
     const { accessToken, sheetId } = config;
 
     try {
-        // First, check if sheet already has headers
-        const checkResponse = await fetch(
-            `${SHEETS_API_BASE}/${sheetId}/values/A1:I1`,
+        // 1. Get Spreadsheet Metadata to see existing sheets
+        const metadataResponse = await fetch(
+            `${SHEETS_API_BASE}/${sheetId}`,
             {
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
@@ -39,42 +42,96 @@ export async function initializeSheet(config: SheetsServiceConfig): Promise<bool
             }
         );
 
-        if (!checkResponse.ok) {
-            console.error('Failed to check sheet:', await checkResponse.text());
-            return false;
+        if (!metadataResponse.ok) return false;
+
+        const metadata = await metadataResponse.json();
+        const sheets = metadata.sheets || [];
+
+        // 2. Check for "Transactions" sheet
+        const transactionsSheet = sheets.find((s: any) => s.properties.title === SHEET_NAME);
+
+        if (!transactionsSheet) {
+            // Find a candidate to rename (usually the first one if it's not Dashboard)
+            const candidate = sheets.find((s: any) => s.properties.title !== DASHBOARD_SHEET_NAME);
+
+            if (candidate) {
+                // Rename candidate to 'Transactions'
+                console.log(`Renaming sheet "${candidate.properties.title}" to "${SHEET_NAME}"`);
+                await fetch(
+                    `${SHEETS_API_BASE}/${sheetId}:batchUpdate`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            requests: [{
+                                updateSheetProperties: {
+                                    properties: {
+                                        sheetId: candidate.properties.sheetId,
+                                        title: SHEET_NAME
+                                    },
+                                    fields: 'title'
+                                }
+                            }]
+                        })
+                    }
+                );
+            } else {
+                // No candidate found (only Dashboard exists?), create new
+                console.log('Creating new Transactions sheet');
+                await fetch(
+                    `${SHEETS_API_BASE}/${sheetId}:batchUpdate`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            requests: [{
+                                addSheet: {
+                                    properties: { title: SHEET_NAME }
+                                }
+                            }]
+                        })
+                    }
+                );
+            }
         }
+
+        // 3. Ensure Headers Exist on Transactions Sheet
+        const checkResponse = await fetch(
+            `${SHEETS_API_BASE}/${sheetId}/values/${SHEET_NAME}!A1:I1`,
+            {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                },
+            }
+        );
 
         const checkData = await checkResponse.json();
 
-        // If headers already exist, don't overwrite
-        if (checkData.values && checkData.values[0] && checkData.values[0][0] === 'id') {
-            console.log('Sheet already initialized');
-            return true;
+        // If headers missing, write them
+        if (!checkData.values || !checkData.values[0] || checkData.values[0][0] !== 'id') {
+            await fetch(
+                `${SHEETS_API_BASE}/${sheetId}/values/${SHEET_NAME}!A1:I1?valueInputOption=RAW`,
+                {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        range: `${SHEET_NAME}!A1:I1`,
+                        majorDimension: 'ROWS',
+                        values: [HEADERS],
+                    }),
+                }
+            );
         }
 
-        // Add headers to the sheet
-        const response = await fetch(
-            `${SHEETS_API_BASE}/${sheetId}/values/A1:I1?valueInputOption=RAW`,
-            {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    range: 'A1:I1',
-                    majorDimension: 'ROWS',
-                    values: [HEADERS],
-                }),
-            }
-        );
-
-        if (!response.ok) {
-            console.error('Failed to initialize sheet:', await response.text());
-            return false;
-        }
-
-        console.log('Sheet initialized successfully');
         return true;
     } catch (error) {
         console.error('Error initializing sheet:', error);
@@ -98,7 +155,7 @@ export async function fetchEntries(config: SheetsServiceConfig): Promise<Financi
 
     try {
         const response = await fetch(
-            `${SHEETS_API_BASE}/${sheetId}/values/A2:I1000`,
+            `${SHEETS_API_BASE}/${sheetId}/values/${SHEET_NAME}!A2:I1000`,
             {
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
@@ -160,7 +217,7 @@ export async function saveEntry(config: SheetsServiceConfig, entry: FinancialEnt
         ];
 
         const response = await fetch(
-            `${SHEETS_API_BASE}/${sheetId}/values/A:I:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
+            `${SHEETS_API_BASE}/${sheetId}/values/${SHEET_NAME}!A:I:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
             {
                 method: 'POST',
                 headers: {
@@ -199,7 +256,7 @@ export async function deleteEntry(config: SheetsServiceConfig, entryId: string):
     try {
         // First, find the row with this ID
         const response = await fetch(
-            `${SHEETS_API_BASE}/${sheetId}/values/A:A`,
+            `${SHEETS_API_BASE}/${sheetId}/values/${SHEET_NAME}!A:A`,
             {
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
@@ -229,7 +286,7 @@ export async function deleteEntry(config: SheetsServiceConfig, entryId: string):
 
         // Clear the row (we could also delete it, but clearing is simpler)
         const clearResponse = await fetch(
-            `${SHEETS_API_BASE}/${sheetId}/values/A${rowIndex + 1}:I${rowIndex + 1}:clear`,
+            `${SHEETS_API_BASE}/${sheetId}/values/${SHEET_NAME}!A${rowIndex + 1}:I${rowIndex + 1}:clear`,
             {
                 method: 'POST',
                 headers: {
@@ -265,7 +322,7 @@ export async function updateEntry(config: SheetsServiceConfig, entry: FinancialE
     try {
         // First, find the row with this ID
         const response = await fetch(
-            `${SHEETS_API_BASE}/${sheetId}/values/A:A`,
+            `${SHEETS_API_BASE}/${sheetId}/values/${SHEET_NAME}!A:A`,
             {
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
@@ -306,7 +363,7 @@ export async function updateEntry(config: SheetsServiceConfig, entry: FinancialE
         ];
 
         const updateResponse = await fetch(
-            `${SHEETS_API_BASE}/${sheetId}/values/A${rowIndex + 1}:I${rowIndex + 1}?valueInputOption=RAW`,
+            `${SHEETS_API_BASE}/${sheetId}/values/${SHEET_NAME}!A${rowIndex + 1}:I${rowIndex + 1}?valueInputOption=RAW`,
             {
                 method: 'PUT',
                 headers: {
@@ -314,7 +371,7 @@ export async function updateEntry(config: SheetsServiceConfig, entry: FinancialE
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    range: `A${rowIndex + 1}:I${rowIndex + 1}`,
+                    range: `${SHEET_NAME}!A${rowIndex + 1}:I${rowIndex + 1}`,
                     majorDimension: 'ROWS',
                     values: [row],
                 }),
@@ -369,7 +426,7 @@ export async function fetchDashboardSettings(config: SheetsServiceConfig): Promi
     try {
         // Try to read Dashboard!B3:B4
         const response = await fetch(
-            `${SHEETS_API_BASE}/${sheetId}/values/Dashboard!B3:B4`,
+            `${SHEETS_API_BASE}/${sheetId}/values/${DASHBOARD_SHEET_NAME}!B3:B4`,
             {
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
@@ -420,7 +477,7 @@ export async function updateDashboardSettings(config: SheetsServiceConfig, setti
         const formattedDate = settings.startDate ? settings.startDate.toISOString().split('T')[0] : '';
 
         const response = await fetch(
-            `${SHEETS_API_BASE}/${sheetId}/values/Dashboard!B3:B4?valueInputOption=USER_ENTERED`,
+            `${SHEETS_API_BASE}/${sheetId}/values/${DASHBOARD_SHEET_NAME}!B3:B4?valueInputOption=USER_ENTERED`,
             {
                 method: 'PUT',
                 headers: {
@@ -428,7 +485,7 @@ export async function updateDashboardSettings(config: SheetsServiceConfig, setti
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    range: 'Dashboard!B3:B4',
+                    range: `${DASHBOARD_SHEET_NAME}!B3:B4`,
                     majorDimension: 'ROWS',
                     values: [
                         [formattedDate],
@@ -454,7 +511,7 @@ export async function updateDashboardSettings(config: SheetsServiceConfig, setti
                     body: JSON.stringify({
                         requests: [{
                             addSheet: {
-                                properties: { title: 'Dashboard', index: 0, gridProperties: { rowCount: 10, columnCount: 5 } }
+                                properties: { title: DASHBOARD_SHEET_NAME, index: 0, gridProperties: { rowCount: 10, columnCount: 5 } }
                             }
                         }]
                     })
@@ -463,7 +520,7 @@ export async function updateDashboardSettings(config: SheetsServiceConfig, setti
 
             // Initialize headers
             await fetch(
-                `${SHEETS_API_BASE}/${sheetId}/values/Dashboard!A1:A4?valueInputOption=USER_ENTERED`,
+                `${SHEETS_API_BASE}/${sheetId}/values/${DASHBOARD_SHEET_NAME}!A1:A4?valueInputOption=USER_ENTERED`,
                 {
                     method: 'PUT',
                     headers: {
@@ -471,7 +528,7 @@ export async function updateDashboardSettings(config: SheetsServiceConfig, setti
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        range: 'Dashboard!A1:A4',
+                        range: `${DASHBOARD_SHEET_NAME}!A1:A4`,
                         majorDimension: 'COLUMNS',
                         values: [['DoughFlow Settings', '', 'Forecast Start Date', 'Current Reserve Balance']]
                     })
@@ -480,7 +537,7 @@ export async function updateDashboardSettings(config: SheetsServiceConfig, setti
 
             // Retry update path
             await fetch(
-                `${SHEETS_API_BASE}/${sheetId}/values/Dashboard!B3:B4?valueInputOption=USER_ENTERED`,
+                `${SHEETS_API_BASE}/${sheetId}/values/${DASHBOARD_SHEET_NAME}!B3:B4?valueInputOption=USER_ENTERED`,
                 {
                     method: 'PUT',
                     headers: {
@@ -488,7 +545,7 @@ export async function updateDashboardSettings(config: SheetsServiceConfig, setti
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        range: 'Dashboard!B3:B4',
+                        range: `${DASHBOARD_SHEET_NAME}!B3:B4`,
                         majorDimension: 'ROWS',
                         values: [
                             [formattedDate],
