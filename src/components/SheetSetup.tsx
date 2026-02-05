@@ -148,7 +148,7 @@ export default function SheetSetup({ onComplete }: SheetSetupProps) {
                     </button>
                 </form>
 
-                <div className="mt-6 pt-4 border-t border-mgs-gray/30">
+                <div className="mt-6 pt-4 border-t border-mgs-gray/30 flex flex-col gap-2">
                     <p className="text-xs text-mgs-gray font-mono text-center">
                         💡 Create a new sheet at{' '}
                         <a
@@ -160,6 +160,18 @@ export default function SheetSetup({ onComplete }: SheetSetupProps) {
                             sheets.new
                         </a>
                     </p>
+
+                    <button
+                        onClick={() => {
+                            // Clear everything and force reload to clear auth state
+                            localStorage.clear();
+                            window.location.href = '/login';
+                        }}
+                        className="text-[10px] text-mgs-gray hover:text-red-400 font-mono text-center underline mt-2"
+                        type="button"
+                    >
+                        Wrong account? Sign Out
+                    </button>
                 </div>
             </div>
         </div>

@@ -1,17 +1,6 @@
 import { useState, useEffect } from "react";
 import LineGraph, { IntervalType } from "@/components/LineGraph";
 import { MONTH_OPTIONS } from "@/utils/monthOptions";
-import Calendar from "@/components/Calendar";
-// import BarGraph from "@/components/BarGraph"; // No longer used
-import BillForm from "@/components/BillForm";
-import CsvImport from "@/components/CsvImport";
-import PaycheckForm from "@/components/PaycheckForm";
-import EntryList from "@/components/EntryList";
-import PurchaseForm from "@/components/PurchaseForm";
-import PurchaseRadio from "@/components/ui/purchase-radio";
-import OnboardingDialog from "@/components/OnboardingDialog";
-import OnboardingHint from "@/components/ui/OnboardingHint";
-import SheetSetup from "@/components/SheetSetup";
 import { useAuth } from "@/auth/AuthContext";
 import { FinancialEntry, EntryType, DailyReserve, DashboardConfig } from "@/types";
 import { calculateRecurringEntries, calculateDailyReserves, formatDateToMonthDayYear, formatDateToYYYYMMDD, parseLocalDateString } from "@/utils/dateUtils";
@@ -19,120 +8,85 @@ import { v4 as uuidv4 } from "uuid";
 import * as sheetsService from "@/services/sheetsService";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import { OpsCard } from "@/components/ui/OpsCard";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { CalendarIcon, Edit2, Loader2, Plus, RefreshCw } from "lucide-react";
+import { cn } from "@/lib/utils";
+import OnboardingDialog from "@/components/OnboardingDialog";
+import SheetSetup from "@/components/SheetSetup";
 
 const Index = () => {
-  const { user, accessToken, logout } = useAuth();
+  const { user, accessToken } = useAuth();
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [entryType, setEntryType] = useState<EntryType>("bill");
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+
+  // Data State
   const [entries, setEntries] = useState<FinancialEntry[]>([]);
   const [reserves, setReserves] = useState<DailyReserve[]>([]);
-  const [hiddenIds, setHiddenIds] = useState<string[]>([]);
+  const [dashboardConfig, setDashboardConfig] = useState<DashboardConfig>({ startDate: null, startBalance: 0 });
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [selectedMonths, setSelectedMonths] = useState<number[]>([new Date().getMonth()]);
 
-  // Dashboard Sync State
-  const [dashboardConfig, setDashboardConfig] = useState<DashboardConfig>({ startDate: null, startBalance: 0 });
+  // UI State
   const [showReconcileDialog, setShowReconcileDialog] = useState(false);
   const [reconcileBalance, setReconcileBalance] = useState<string>("");
+  const [chartRange, setChartRange] = useState<"1M" | "2M" | "3M" | "ALL">("3M");
 
-  const toggleVisibility = (id: string) => {
-    setHiddenIds((prev) => prev.includes(id) ? prev.filter(hid => hid !== id) : [...prev, id]);
-  };
+  // Form State
+  const [formType, setFormType] = useState<"expense" | "paycheck">("expense");
+  const [formData, setFormData] = useState({
+    date: formatDateToYYYYMMDD(new Date()),
+    description: "",
+    amount: "",
+    frequency: "one-time" as const,
+    limit: ""
+  });
 
-  // Calculate reserves when entries or selectedDate change
-  const visibleEntries = entries.filter(e => !hiddenIds.includes(e.id));
-
-  // Main Calculation Effect
+  // Calculate Reserves Effect
   useEffect(() => {
-    // Determine start date: Use Dashboard Config Start Date if available, else fallback to first entry or selected date
+    // 1. Determine Start Date (Anchor)
     let calculationStartDate: Date;
-
     if (dashboardConfig.startDate) {
       calculationStartDate = new Date(dashboardConfig.startDate);
     } else {
-      calculationStartDate = visibleEntries.length > 0
-        ? visibleEntries.reduce((min, e) => e.date < min ? e.date : min, visibleEntries[0].date)
-        : new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
-      calculationStartDate = new Date(calculationStartDate.getFullYear(), calculationStartDate.getMonth(), 1);
+      calculationStartDate = new Date();
+      calculationStartDate.setDate(1); // Default to 1st of current month
     }
 
-    const endDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 24, 0); // 24 months ahead
+    // 2. Determine End Date (24 months out approx)
+    const endDate = new Date(calculationStartDate);
+    endDate.setMonth(endDate.getMonth() + 24);
 
-    const recurringEntries = calculateRecurringEntries(visibleEntries, calculationStartDate, endDate);
+    // 3. Expand Recurring Entries
+    const recurringEntries = calculateRecurringEntries(entries, calculationStartDate, endDate);
+
+    // 4. Calculate Daily Balance (Raw)
     const dailyReservesRaw = calculateDailyReserves(recurringEntries, calculationStartDate, endDate);
 
-    // Apply Start Balance Offset
+    // 5. Apply Start Balance Offset
     const dailyReserves = dailyReservesRaw.map(dr => ({
       ...dr,
       reserve: dr.reserve + (dashboardConfig.startBalance || 0)
     }));
 
     setReserves(dailyReserves);
-  }, [entries, selectedDate, hiddenIds, dashboardConfig]);
+  }, [entries, dashboardConfig]);
 
-  // Handle form submission
-  const handleEntrySubmit = async (newEntry: Omit<FinancialEntry, 'id'>) => {
-    const entryWithId: FinancialEntry = {
-      ...newEntry,
-      id: uuidv4()
-    };
-    setEntries(prevEntries => [...prevEntries, entryWithId]);
-
-    if (user?.sheetId && accessToken) {
-      setIsSaving(true);
-      await sheetsService.saveEntry({ accessToken, sheetId: user.sheetId }, entryWithId);
-      setIsSaving(false);
-    }
-  };
-
-  const handleCsvImport = (imported: FinancialEntry[]) => {
-    setEntries(prev => [...prev, ...imported]);
-  };
-
-  const [editingEntry, setEditingEntry] = useState<FinancialEntry | null>(null);
-
-  const handleDeleteEntry = async (id: string) => {
-    setEntries(prevEntries => prevEntries.filter(entry => entry.id !== id));
-    if (editingEntry && editingEntry.id === id) setEditingEntry(null);
-
-    if (user?.sheetId && accessToken) {
-      await sheetsService.deleteEntry({ accessToken, sheetId: user.sheetId }, id);
-    }
-  };
-
-  const handleEditEntry = (entry: FinancialEntry) => setEditingEntry(entry);
-
-  const handleSaveEdit = async (updated: FinancialEntry) => {
-    setEntries(prevEntries => prevEntries.map(e => e.id === updated.id ? updated : e));
-    setEditingEntry(null);
-
-    if (user?.sheetId && accessToken) {
-      await sheetsService.updateEntry({ accessToken, sheetId: user.sheetId }, updated);
-    }
-  };
-
-  const handleCancelEdit = () => setEditingEntry(null);
-
-  // Load entries & dashboard config from Google Sheets on mount
+  // Load Data Effect
   useEffect(() => {
     const loadData = async () => {
       if (user?.sheetId && accessToken) {
         setIsLoadingData(true);
         try {
-          // Parallel fetch
           const [loadedEntries, loadedConfig] = await Promise.all([
             sheetsService.fetchEntries({ accessToken, sheetId: user.sheetId }),
             sheetsService.fetchDashboardSettings({ accessToken, sheetId: user.sheetId })
           ]);
-
           setEntries(loadedEntries);
           setDashboardConfig(loadedConfig);
         } catch (error) {
@@ -147,12 +101,13 @@ const Index = () => {
     loadData();
   }, [user?.sheetId, accessToken]);
 
+  // Handlers
   const handleReconcile = async () => {
     const newBalance = parseFloat(reconcileBalance);
     if (isNaN(newBalance)) return;
 
     const newConfig: DashboardConfig = {
-      startDate: new Date(), // Anchor to today
+      startDate: new Date(),
       startBalance: newBalance
     };
 
@@ -164,228 +119,335 @@ const Index = () => {
     }
   };
 
-  // If user hasn't linked a sheet yet, show setup
-  if (!user?.sheetId) {
-    return <SheetSetup onComplete={() => window.location.reload()} />;
-  }
+  const handleAddTransaction = async () => {
+    if (!formData.description || !formData.amount) return;
 
-  // Show loading state
-  if (isLoadingData) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-primary font-orbitron text-xl animate-pulse">
-          LOADING INTEL...
-        </div>
-      </div>
-    );
-  }
+    const newEntry: FinancialEntry = {
+      id: uuidv4(),
+      type: formType === 'expense' ? 'bill' : 'paycheck', // simplified mapping
+      name: formData.description,
+      amount: parseFloat(formData.amount),
+      date: parseLocalDateString(formData.date),
+      frequency: formData.frequency,
+      occurrenceLimit: formData.limit ? parseInt(formData.limit) : undefined
+    };
+
+    // Optimistic Update
+    setEntries(prev => [...prev, newEntry]);
+
+    // Reset Form
+    setFormData(prev => ({ ...prev, description: "", amount: "", limit: "" }));
+
+    // Persist
+    if (user?.sheetId && accessToken) {
+      setIsSaving(true);
+      await sheetsService.saveEntry({ accessToken, sheetId: user.sheetId }, newEntry);
+      setIsSaving(false);
+    }
+  };
+
+  // Filter Chart Data based on Range
+  const getChartData = () => {
+    const now = new Date();
+    let monthsToAdd = 3;
+    if (chartRange === "1M") monthsToAdd = 1;
+    if (chartRange === "2M") monthsToAdd = 2;
+    if (chartRange === "ALL") monthsToAdd = 24;
+
+    const endDate = new Date(now);
+    endDate.setMonth(endDate.getMonth() + monthsToAdd);
+
+    return reserves.filter(r => r.date >= now && r.date <= endDate);
+  };
+
+  // Insights
+  const getLowestBalance = () => {
+    const next30Days = reserves.filter(r => {
+      const diffTime = r.date.getTime() - new Date().getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return diffDays >= 0 && diffDays <= 30;
+    });
+    if (next30Days.length === 0) return null;
+
+    return next30Days.reduce((min, curr) => curr.reserve < min.reserve ? curr : min, next30Days[0]);
+  };
+  const lowest = getLowestBalance();
+
+  const getUpcomingDays = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return reserves.filter(r => r.date >= today).slice(0, 10);
+  };
+
+  if (!user?.sheetId) return <SheetSetup onComplete={() => window.location.reload()} />;
+  if (isLoadingData) return <div className="min-h-screen bg-ops-bg flex items-center justify-center text-ops-accent animate-pulse">Initializing Ops Deck...</div>;
 
   return (
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <div className="flex flex-col h-full bg-background p-6 lg:p-10 gap-8">
+        <div className="flex flex-col h-full bg-ops-bg text-ops-text p-4 lg:p-8 gap-6 overflow-y-auto">
 
-          {/* Dashboard Header */}
-          <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div className="flex items-center gap-4">
-              <SidebarTrigger />
-              <div>
-                <h2 className="font-orbitron font-bold text-xs text-primary tracking-[0.2em] mb-1">SECONDBRAIN</h2>
-                <h1 className="font-orbitron text-3xl font-bold tracking-widest text-foreground">OPS DECK</h1>
+          {/* Header */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-end border-b border-ops-border pb-6 gap-4">
+            <div>
+              <h1 className="text-3xl font-orbitron font-bold text-ops-accent mb-1 tracking-wider">Dough Hound</h1>
+              <p className="text-ops-dim font-mono text-sm">Reserve Balance Forecaster</p>
+            </div>
+            <div className="flex items-center gap-6">
+              <div className="text-right">
+                <div className="text-[10px] font-mono text-ops-dim uppercase tracking-widest mb-1">Current Reserve</div>
+                <div className="flex items-center justify-end gap-2 group cursor-pointer" onClick={() => setShowReconcileDialog(true)}>
+                  <span className="text-3xl font-orbitron font-bold text-white group-hover:text-ops-accent transition-colors">
+                    ${reserves[0]?.reserve.toFixed(2) || "0.00"}
+                  </span>
+                  <Edit2 size={14} className="text-ops-dim group-hover:text-ops-accent" />
+                </div>
+                <div className="text-[10px] text-right text-ops-accent cursor-pointer hover:underline mt-1" onClick={() => setShowReconcileDialog(true)}>Sync to Today</div>
               </div>
+              <Button className="hidden md:flex bg-ops-accent hover:bg-teal-400 text-ops-bg font-bold font-mono text-xs items-center gap-2" onClick={() => document.getElementById('transaction-form')?.scrollIntoView({ behavior: 'smooth' })}>
+                <Plus size={16} /> QUICK ADD EXPENSE
+              </Button>
+            </div>
+          </div>
+
+          {/* Main Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            {/* LEFT COLUMN (Chart & Schedule) */}
+            <div className="lg:col-span-2 space-y-6">
+
+              {/* Projection Chart */}
+              <Card className="bg-ops-card border-ops-border shadow-lg">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-lg font-orbitron text-white">Projection</CardTitle>
+                  <Tabs defaultValue="3M" className="w-auto" onValueChange={(v) => setChartRange(v as any)}>
+                    <TabsList className="bg-ops-panel h-8 border border-ops-border">
+                      <TabsTrigger value="1M" className="text-xs font-mono data-[state=active]:bg-ops-accent data-[state=active]:text-ops-bg h-6">1M</TabsTrigger>
+                      <TabsTrigger value="2M" className="text-xs font-mono data-[state=active]:bg-ops-accent data-[state=active]:text-ops-bg h-6">2M</TabsTrigger>
+                      <TabsTrigger value="3M" className="text-xs font-mono data-[state=active]:bg-ops-accent data-[state=active]:text-ops-bg h-6">3M</TabsTrigger>
+                      <TabsTrigger value="ALL" className="text-xs font-mono data-[state=active]:bg-ops-accent data-[state=active]:text-ops-bg h-6">All</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[300px] w-full mt-4">
+                    <LineGraph
+                      data={getChartData()}
+                      interval={chartRange === 'ALL' ? 'monthly' : 'custom'}
+                      selectedDate={new Date()}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Upcoming Schedule */}
+              <div className="space-y-4">
+                <h3 className="font-orbitron text-sm text-ops-dim uppercase tracking-widest pl-1">Upcoming 10 Days</h3>
+                <div className="bg-ops-card border border-ops-border rounded-lg overflow-hidden">
+                  <table className="w-full text-sm font-mono">
+                    <thead>
+                      <tr className="bg-ops-panel/50 text-ops-dim text-xs uppercase text-left">
+                        <th className="p-3 font-normal">Date</th>
+                        <th className="p-3 font-normal">Net (+/-)</th>
+                        <th className="p-3 font-normal">Balance</th>
+                        <th className="p-3 font-normal">Events</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-ops-border/30">
+                      {getUpcomingDays().map((day, i) => {
+                        // Calculate simple net for display (this day only)
+                        const dayTotal = day.entries.reduce((acc, e) => {
+                          return e.type === 'paycheck' ? acc + e.amount : acc - e.amount;
+                        }, 0);
+
+                        const entryNames = day.entries.map(e => {
+                          const sign = e.type === 'paycheck' ? '+' : '-'; // Simplify display
+                          return `${e.name} (${sign}${e.amount})`;
+                        }).join(', ');
+
+                        return (
+                          <tr key={i} className="hover:bg-ops-panel/30 transition-colors group">
+                            <td className="p-3 text-ops-dim">{formatDateToYYYYMMDD(day.date)}</td>
+                            <td className={cn("p-3 font-bold", dayTotal > 0 ? "text-ops-success" : dayTotal < 0 ? "text-ops-danger" : "text-ops-dim")}>
+                              {dayTotal > 0 ? "+" : ""}{dayTotal === 0 ? "0.00" : dayTotal.toFixed(2)}
+                            </td>
+                            <td className="p-3 text-white font-bold">${day.reserve.toFixed(2)}</td>
+                            <td className="p-3 text-ops-dim text-xs truncate max-w-[200px]" title={entryNames}>
+                              {entryNames || "-"}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
             </div>
 
-            <div className="flex items-center gap-2">
-              <div className="hidden md:flex items-center px-4 py-2 rounded-full border border-primary/20 bg-background/50 backdrop-blur-sm gap-2">
-                <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                <span className="font-mono text-xs text-muted-foreground uppercase tracking-widest">FOCUS: DEEP</span>
-              </div>
-              <div className="items-center px-4 py-2 rounded-full border border-primary/20 bg-background/50 backdrop-blur-sm gap-2 hidden md:flex">
-                <span className="font-mono text-xs text-muted-foreground uppercase tracking-widest text-amber-500">MODE: BUILD</span>
-              </div>
-              <button
-                onClick={() => setShowOnboarding(true)}
-                className="items-center px-4 py-2 rounded-full border border-primary bg-primary/10 hover:bg-primary/20 transition-colors gap-2 flex"
-              >
-                <span className="font-mono text-xs text-primary uppercase tracking-widest">OPERATOR: {user.name.split(' ')[0].toUpperCase()}</span>
-              </button>
+            {/* RIGHT COLUMN (Form & Insights) */}
+            <div className="space-y-6">
+
+              {/* Add Transaction Form */}
+              <Card className="bg-ops-card border-ops-border shadow-lg" id="transaction-form">
+                <CardHeader>
+                  <CardTitle className="text-ops-accent font-orbitron text-lg">Add Transaction</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Type Toggle */}
+                  <div className="grid grid-cols-2 gap-2 bg-ops-panel p-1 rounded-md">
+                    <button
+                      onClick={() => setFormType('expense')}
+                      className={cn("py-2 text-sm font-bold rounded transition-all", formType === 'expense' ? "bg-ops-danger text-white shadow" : "text-ops-dim hover:text-white")}
+                    >
+                      Expense
+                    </button>
+                    <button
+                      onClick={() => setFormType('paycheck')}
+                      className={cn("py-2 text-sm font-bold rounded transition-all", formType === 'paycheck' ? "bg-ops-panel text-white shadow border border-ops-border" : "text-ops-dim hover:text-white")} // Using simplified style for inactive/active check
+                    >
+                      Paycheck
+                    </button>
+                  </div>
+
+                  {/* Date */}
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-mono text-ops-dim uppercase">Date</Label>
+                    <div className="relative">
+                      <Input
+                        type="date"
+                        className="bg-ops-panel border-ops-border text-white font-mono pl-10"
+                        value={formData.date}
+                        onChange={e => setFormData({ ...formData, date: e.target.value })}
+                      />
+                      <CalendarIcon size={14} className="absolute left-3 top-3 text-ops-dim" />
+                    </div>
+                  </div>
+
+                  {/* Description */}
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-mono text-ops-dim uppercase">Description</Label>
+                    <Input
+                      type="text"
+                      className="bg-ops-panel border-ops-border text-white placeholder:text-ops-dim/30"
+                      placeholder="e.g. Grocery Run"
+                      value={formData.description}
+                      onChange={e => setFormData({ ...formData, description: e.target.value })}
+                    />
+                  </div>
+
+                  {/* Amount & Frequency */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-mono text-ops-dim uppercase">Amount</Label>
+                      <Input
+                        type="number"
+                        className="bg-ops-panel border-ops-border text-white"
+                        placeholder="0.00"
+                        value={formData.amount}
+                        onChange={e => setFormData({ ...formData, amount: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-mono text-ops-dim uppercase">Frequency</Label>
+                      <Select value={formData.frequency} onValueChange={(v: any) => setFormData({ ...formData, frequency: v })}>
+                        <SelectTrigger className="bg-ops-panel border-ops-border text-white">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-ops-card border-ops-border text-white">
+                          <SelectItem value="one-time">One-Time</SelectItem>
+                          <SelectItem value="weekly">Weekly</SelectItem>
+                          <SelectItem value="bi-weekly">Bi-Weekly</SelectItem>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                          <SelectItem value="every-4-weeks">Every 4 Weeks</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* Limit */}
+                  {formData.frequency !== 'one-time' && (
+                    <div className="space-y-1 animate-accordion-down">
+                      <Label className="text-[10px] font-mono text-ops-dim uppercase">Limit (Optional)</Label>
+                      <Input
+                        type="number"
+                        className="bg-ops-panel border-ops-border text-white placeholder:text-ops-dim/30"
+                        placeholder="e.g. 6 payments left"
+                        value={formData.limit}
+                        onChange={e => setFormData({ ...formData, limit: e.target.value })}
+                      />
+                      <p className="text-[10px] text-ops-dim">Leave empty for indefinite.</p>
+                    </div>
+                  )}
+
+                  <Button
+                    className={cn("w-full font-bold", formType === 'expense' ? "bg-ops-danger hover:bg-red-600" : "bg-ops-success hover:bg-green-600")}
+                    onClick={handleAddTransaction}
+                    disabled={isSaving}
+                  >
+                    {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
+                    {formType === 'expense' ? 'Add Expense' : 'Add Paycheck'}
+                  </Button>
+
+                </CardContent>
+              </Card>
+
+              {/* Insight Card */}
+              <Card className="bg-ops-card border-ops-border shadow-lg">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-mono text-ops-dim uppercase tracking-widest">Insight</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {lowest ? (
+                    <div>
+                      <p className="text-sm text-ops-text">
+                        Lowest projected balance is <span className="text-ops-danger font-bold">${lowest.reserve.toFixed(2)}</span> on <span className="text-white">{formatDateToYYYYMMDD(lowest.date)}</span>.
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-ops-dim">Not enough data to project lows.</p>
+                  )}
+                </CardContent>
+              </Card>
+
             </div>
-          </header>
+          </div>
 
           <OnboardingDialog open={showOnboarding} onClose={() => setShowOnboarding(false)} />
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
-
-            {/* Left Column: Main Ops Card (Forecast) */}
-            <div className="lg:col-span-2 flex flex-col gap-6">
-              <OpsCard
-                title="DOUGH_HOUND_V1_(WEB_APP)"
-                subtitle={`CLIENT: ${user.name.toUpperCase()} // FOCUS: FINANCIAL FORECAST + RUNWAY`}
-                className="flex-1 flex flex-col"
-              >
-                <div className="flex gap-8 mb-8 border-b border-border/50 pb-8 relative group/balance">
-                  <div>
-                    <span className="font-mono text-xs text-muted-foreground tracking-widest block mb-1">
-                      CURRENT BALANCE
-                      <span className="ml-2 text-[10px] text-primary cursor-pointer hover:underline" onClick={() => setShowReconcileDialog(true)}>[SYNC]</span>
-                    </span>
-                    <span className="font-orbitron text-4xl text-primary font-bold">
-                      ${reserves.length > 0 ? reserves[0].reserve.toFixed(2) : '0.00'}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="font-mono text-xs text-muted-foreground tracking-widest block mb-1">ENTRIES</span>
-                    <span className="font-orbitron text-4xl text-amber-500 font-bold">{entries.length}</span>
-                  </div>
-                </div>
-
-                <div className="mb-8">
-                  <div className="flex justify-between items-end mb-2">
-                    <span className="font-mono text-xs text-muted-foreground tracking-widest">MOMENTUM</span>
-                    <span className="font-mono text-xs text-primary">100%</span>
-                  </div>
-                  <Progress value={100} className="h-2 bg-secondary" indicatorClassName="bg-gradient-to-r from-primary to-amber-500" />
-                </div>
-
-                <div className="flex-1 w-full min-h-[300px]">
-                  {/* Month Selection */}
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {MONTH_OPTIONS.map(opt => (
-                      <label key={opt.value} className={`px-2 py-1 rounded text-[10px] font-orbitron border cursor-pointer transition-colors ${selectedMonths.includes(opt.value) ? 'bg-primary text-background border-primary' : 'bg-transparent text-muted-foreground border-border hover:border-primary/50'}`}>
-                        <input
-                          type="checkbox"
-                          checked={selectedMonths.includes(opt.value)}
-                          onChange={e => {
-                            setSelectedMonths(prev =>
-                              e.target.checked
-                                ? [...prev, opt.value].slice(0, 12)
-                                : prev.filter(m => m !== opt.value)
-                            );
-                          }}
-                          className="hidden"
-                        />
-                        {opt.label}
-                      </label>
-                    ))}
-                  </div>
-
-                  <LineGraph
-                    data={reserves
-                      .filter(r =>
-                        selectedMonths.includes(r.date.getMonth()) &&
-                        r.date.getFullYear() === new Date().getFullYear()
-                      )
-                      .sort((a, b) => a.date.getTime() - b.date.getTime())
-                    }
-                    interval={"custom"}
-                    selectedDate={selectedDate}
-                    entries={entries}
+          {/* Reconcile Dialog */}
+          <Dialog open={showReconcileDialog} onOpenChange={setShowReconcileDialog}>
+            <DialogContent className="bg-ops-card border-ops-accent text-white font-mono">
+              <DialogHeader>
+                <DialogTitle className="font-orbitron text-ops-accent">SYNC ANCHOR POINT</DialogTitle>
+              </DialogHeader>
+              <div className="py-4 space-y-4">
+                <p className="text-xs text-ops-dim">
+                  Set the actual bank balance for TODAY ({formatDateToMonthDayYear(new Date())}).
+                  This will anchor your forecast from this point forward.
+                </p>
+                <div className="grid w-full items-center gap-1.5">
+                  <Label htmlFor="balance" className="text-ops-dim">Current Reserve Balance</Label>
+                  <Input
+                    id="balance"
+                    type="number"
+                    placeholder="0.00"
+                    value={reconcileBalance}
+                    onChange={(e) => setReconcileBalance(e.target.value)}
+                    className="font-mono text-lg bg-ops-panel border-ops-accent focus:ring-ops-accent text-white"
                   />
                 </div>
-              </OpsCard>
-            </div>
-
-            {/* Right Column: Next Up & Daily Loop */}
-            <div className="flex flex-col gap-6">
-              {/* Next Up (Intel Input) */}
-              <OpsCard title="INTEL INPUT" subtitle="LOG ACQUISITION / EXPENDITURE" className="h-auto">
-                <div className="flex justify-between items-center mb-4">
-                  <h4 className="font-orbitron text-xs text-muted-foreground">SELECTED DATE</h4>
-                  <span className="font-mono text-xs text-primary">{formatDateToMonthDayYear(selectedDate)}</span>
-                </div>
-
-                <div className="bg-background/50 rounded-lg p-2 mb-4 border border-border">
-                  <Calendar selectedDate={selectedDate} onDateSelect={setSelectedDate} />
-                </div>
-
-                <div className="flex justify-center gap-2 mb-4 bg-background/50 p-2 rounded-lg">
-                  <button
-                    onClick={() => setEntryType("bill")}
-                    className={`flex-1 py-2 text-xs font-orbitron rounded transition-colors ${entryType === 'bill' ? 'bg-primary text-background' : 'text-muted-foreground hover:bg-secondary'}`}
-                  >
-                    BILL
-                  </button>
-                  <button
-                    onClick={() => setEntryType("paycheck")}
-                    className={`flex-1 py-2 text-xs font-orbitron rounded transition-colors ${entryType === 'paycheck' ? 'bg-primary text-background' : 'text-muted-foreground hover:bg-secondary'}`}
-                  >
-                    PAYCHECK
-                  </button>
-                  <button
-                    onClick={() => setEntryType("purchase")}
-                    className={`flex-1 py-2 text-xs font-orbitron rounded transition-colors ${entryType === 'purchase' ? 'bg-primary text-background' : 'text-muted-foreground hover:bg-secondary'}`}
-                  >
-                    PURCHASE
-                  </button>
-                </div>
-
-                <div className="space-y-4">
-                  {entryType === "bill" ? (
-                    <BillForm selectedDate={selectedDate} onSubmit={handleEntrySubmit} />
-                  ) : entryType === "paycheck" ? (
-                    <PaycheckForm selectedDate={selectedDate} onSubmit={handleEntrySubmit} />
-                  ) : (
-                    <PurchaseForm selectedDate={selectedDate} onSubmit={handleEntrySubmit} />
-                  )}
-                </div>
-              </OpsCard>
-
-              {/* Daily Loop (Operations Log) */}
-              <OpsCard title="DAILY LOOP" subtitle="OPERATIONS LOG" className="flex-1">
-                <div className="h-[300px] overflow-auto pr-2">
-                  <EntryList
-                    entries={entries}
-                    onDeleteEntry={handleDeleteEntry}
-                    onEditEntry={handleEditEntry}
-                    editingEntryId={editingEntry?.id}
-                    onSaveEdit={handleSaveEdit}
-                    onCancelEdit={handleCancelEdit}
-                    hiddenIds={hiddenIds}
-                    toggleVisibility={toggleVisibility}
-                  />
-                </div>
-              </OpsCard>
-
-            </div>
-          </div>
-
-          <footer className="text-center text-[10px] text-muted-foreground font-mono opacity-50">
-            SYSTEM STATUS: OPERATIONAL // V1.0.0
-          </footer>
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setShowReconcileDialog(false)} className="text-ops-dim hover:text-white hover:bg-ops-panel">CANCEL</Button>
+                <Button onClick={handleReconcile} className="bg-ops-accent text-ops-bg hover:bg-teal-400 font-orbitron font-bold">SYNC & LOCK</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
         </div>
       </SidebarInset>
-
-      {/* Reconcile Dialog */}
-      <Dialog open={showReconcileDialog} onOpenChange={setShowReconcileDialog}>
-        <DialogContent className="bg-card border-primary/20 text-foreground font-mono">
-          <DialogHeader>
-            <DialogTitle className="font-orbitron text-primary">SYNC ANCHOR POINT</DialogTitle>
-          </DialogHeader>
-          <div className="py-4 space-y-4">
-            <p className="text-xs text-muted-foreground">
-              Set the actual bank balance for TODAY ({formatDateToMonthDayYear(new Date())}).
-              This will anchor your forecast from this point forward.
-            </p>
-            <div className="grid w-full items-center gap-1.5">
-              <Label htmlFor="balance">Create Reserve Balance</Label>
-              <Input
-                id="balance"
-                type="number"
-                placeholder="0.00"
-                value={reconcileBalance}
-                onChange={(e) => setReconcileBalance(e.target.value)}
-                className="font-mono text-lg border-primary/50 focus:ring-primary"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowReconcileDialog(false)} className="border-destructive/50 text-destructive hover:bg-destructive/10">CANCEL</Button>
-            <Button onClick={handleReconcile} className="bg-primary text-background hover:bg-primary/90 font-orbitron">SYNC & LOCK</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </SidebarProvider>
   );
 };

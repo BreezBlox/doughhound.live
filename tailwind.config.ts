@@ -64,17 +64,17 @@ export default {
 				},
 				// Ops Deck Theme Colors (Cyberpunk / Tactical)
 				ops: {
-					bg: '#050a0f',        // Deepest black/blue
-					card: '#0c1219',      // Slightly lighter card bg
-					panel: '#111820',     // UI panels
-					border: '#1f2937',    // Subtle borders
-					accent: '#2dd4bf',    // Teal accent (Primary)
-					glow: '#0ea5e9',      // Blue glow
-					success: '#10b981',   // Green success
-					warning: '#f59e0b',   // Orange warning
-					danger: '#ef4444',    // Red danger
-					text: '#e2e8f0',      // Main text (Slate 200)
-					dim: '#64748b',       // Dimmed text (Slate 500)
+					bg: '#0f172a',        // Slate 900 (Navy Background)
+					card: '#1e293b',      // Slate 800 (Card Background)
+					panel: '#334155',     // Slate 700 (Input/Panel Background)
+					border: '#475569',    // Slate 600 (Borders)
+					accent: '#3b82f6',    // Blue 500 (Primary Action)
+					glow: '#60a5fa',      // Blue 400 (Glow)
+					success: '#10b981',   // Emerald 500
+					warning: '#f59e0b',   // Amber 500
+					danger: '#ef4444',    // Red 500
+					text: '#f1f5f9',      // Slate 100 (Primary Text)
+					dim: '#94a3b8',       // Slate 400 (Secondary Text)
 				}
 			},
 			fontFamily: {
