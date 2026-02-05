@@ -54,7 +54,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     const savedUser = localStorage.getItem(USER_STORAGE_KEY);
     const savedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
-    
+
     if (savedUser && savedToken) {
       try {
         setUser(JSON.parse(savedUser));
@@ -68,27 +68,42 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setIsLoading(false);
   }, []);
 
-  const login = (credential: string) => {
+  const login = async (token: string) => {
     try {
-      const decoded = decodeJwt(credential);
+      // With access token (useGoogleLogin), we need to fetch user info
+      const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v1/userinfo?alt=json', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!userInfoResponse.ok) {
+        throw new Error('Failed to fetch user info');
+      }
+
+      const userData = await userInfoResponse.json();
+
       const appUser: AppUser = {
-        ...decoded,
+        email: userData.email,
+        name: userData.name,
+        picture: userData.picture,
+        sub: userData.id, // Google UserInfo API returns 'id', not 'sub'
         sheetId: undefined,
       };
-      
+
       // Check if user has a saved sheetId
-      const savedUserData = localStorage.getItem(`doughhound_userdata_${decoded.sub}`);
+      const savedUserData = localStorage.getItem(`doughhound_userdata_${appUser.sub}`);
       if (savedUserData) {
-        const userData = JSON.parse(savedUserData);
-        appUser.sheetId = userData.sheetId;
+        const storedData = JSON.parse(savedUserData);
+        appUser.sheetId = storedData.sheetId;
       }
-      
+
       setUser(appUser);
-      setAccessToken(credential);
+      setAccessToken(token);
       localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(appUser));
-      localStorage.setItem(TOKEN_STORAGE_KEY, credential);
+      localStorage.setItem(TOKEN_STORAGE_KEY, token);
     } catch (e) {
-      console.error('Failed to decode credential:', e);
+      console.error('Login error:', e);
     }
   };
 
