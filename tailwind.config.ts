@@ -62,22 +62,24 @@ export default {
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
 				},
-				// MGS Theme Colors
-				mgs: {
-					green: '#48bb78',
-					darkgreen: '#38a169',
-					red: '#e53e3e',
-					black: '#1a202c',
-					darkgray: '#2d3748',
-					gray: '#4a5568',
-					lightgray: '#a0aec0',
-					text: '#cbd5e0',
-					lightertext: '#e2e8f0',
+				// Ops Deck Theme Colors (Cyberpunk / Tactical)
+				ops: {
+					bg: '#050a0f',        // Deepest black/blue
+					card: '#0c1219',      // Slightly lighter card bg
+					panel: '#111820',     // UI panels
+					border: '#1f2937',    // Subtle borders
+					accent: '#2dd4bf',    // Teal accent (Primary)
+					glow: '#0ea5e9',      // Blue glow
+					success: '#10b981',   // Green success
+					warning: '#f59e0b',   // Orange warning
+					danger: '#ef4444',    // Red danger
+					text: '#e2e8f0',      // Main text (Slate 200)
+					dim: '#64748b',       // Dimmed text (Slate 500)
 				}
 			},
 			fontFamily: {
 				orbitron: ['Orbitron', 'sans-serif'],
-				'roboto-mono': ['Roboto Mono', 'monospace'],
+				mono: ['JetBrains Mono', 'Roboto Mono', 'monospace'], // Updated to JetBrains Mono preference
 			},
 			borderRadius: {
 				lg: 'var(--radius)',
@@ -86,45 +88,27 @@ export default {
 			},
 			keyframes: {
 				'accordion-down': {
-					from: {
-						height: '0'
-					},
-					to: {
-						height: 'var(--radix-accordion-content-height)'
-					}
+					from: { height: '0' },
+					to: { height: 'var(--radix-accordion-content-height)' }
 				},
 				'accordion-up': {
-					from: {
-						height: 'var(--radix-accordion-content-height)'
-					},
-					to: {
-						height: '0'
-					}
+					from: { height: 'var(--radix-accordion-content-height)' },
+					to: { height: '0' }
 				},
 				'pulse-glow': {
-					'0%, 100%': { 
-						boxShadow: '0 0 3px rgba(72, 187, 120, 0.5)'
-					},
-					'50%': { 
-						boxShadow: '0 0 10px rgba(72, 187, 120, 0.8)'
-					}
+					'0%, 100%': { boxShadow: '0 0 5px rgba(45, 212, 191, 0.2)' },
+					'50%': { boxShadow: '0 0 15px rgba(45, 212, 191, 0.5)' }
 				},
-				'fade-in': {
-					'0%': {
-						opacity: '0',
-						transform: 'translateY(10px)'
-					},
-					'100%': {
-						opacity: '1',
-						transform: 'translateY(0)'
-					}
+				'scanline': {
+					'0%': { transform: 'translateY(-100%)' },
+					'100%': { transform: 'translateY(100%)' }
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
 				'accordion-up': 'accordion-up 0.2s ease-out',
-				'pulse-glow': 'pulse-glow 2s infinite ease-in-out',
-				'fade-in': 'fade-in 0.3s ease-out',
+				'pulse-glow': 'pulse-glow 3s infinite ease-in-out',
+				'scanline': 'scanline 8s linear infinite',
 			}
 		}
 	},
