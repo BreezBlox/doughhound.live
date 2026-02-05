@@ -47,8 +47,8 @@ export async function initializeSheet(config: SheetsServiceConfig): Promise<bool
         const metadata = await metadataResponse.json();
         const sheets = metadata.sheets || [];
 
-        // 2. Check for "Transactions" sheet
-        const transactionsSheet = sheets.find((s: any) => s.properties.title === SHEET_NAME);
+        // 2. Check for "Transactions" sheet (Case Insensitive)
+        const transactionsSheet = sheets.find((s: any) => s.properties.title.toLowerCase() === SHEET_NAME.toLowerCase());
 
         if (!transactionsSheet) {
             // Find a candidate to rename (usually the first one if it's not Dashboard)
@@ -216,8 +216,12 @@ export async function saveEntry(config: SheetsServiceConfig, entry: FinancialEnt
             entry.customDates ? JSON.stringify(entry.customDates) : '',
         ];
 
+        const url = `${SHEETS_API_BASE}/${sheetId}/values/${SHEET_NAME}!A:I:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`;
+        console.log(`[DEBUG] Saving to: ${url}`);
+        console.log(`[DEBUG] Payload:`, JSON.stringify({ values: [row] }));
+
         const response = await fetch(
-            `${SHEETS_API_BASE}/${sheetId}/values/${SHEET_NAME}!A:I:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
+            url,
             {
                 method: 'POST',
                 headers: {
@@ -235,10 +239,13 @@ export async function saveEntry(config: SheetsServiceConfig, entry: FinancialEnt
         }
 
         if (!response.ok) {
-            console.error('Failed to save entry:', await response.text());
+            const errorText = await response.text();
+            console.error('[DEBUG] Failed to save entry. Response:', errorText);
             return false;
         }
 
+        const json = await response.json();
+        console.log('[DEBUG] Save Success:', json);
         return true;
     } catch (error) {
         if (error instanceof AuthError) throw error;

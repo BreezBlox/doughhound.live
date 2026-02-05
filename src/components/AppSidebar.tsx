@@ -63,6 +63,11 @@ export function AppSidebar({ entries, onDeleteEntry, onEditEntry, editingEntryId
                                 <span className="text-[10px] text-muted-foreground truncate">{user.email}</span>
                             </div>
                         </div>
+                        {user.sheetId && (
+                            <div className="text-[9px] font-mono text-ops-dim text-center break-all">
+                                ID: {user.sheetId.slice(-6)}
+                            </div>
+                        )}
                         <button
                             onClick={logout}
                             className="w-full text-xs border border-destructive/30 text-destructive hover:bg-destructive/10 py-1 px-2 rounded mt-2 font-mono uppercase transition-colors"
