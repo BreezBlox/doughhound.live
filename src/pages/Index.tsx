@@ -47,6 +47,10 @@ const Index = () => {
     limit: ""
   });
 
+  // Entry Management State (Moved Up)
+  const [editingEntry, setEditingEntry] = useState<FinancialEntry | null>(null);
+  const [hiddenIds, setHiddenIds] = useState<string[]>([]);
+
   // Calculate Reserves Effect
   useEffect(() => {
     // 1. Determine Start Date (Anchor)
@@ -179,9 +183,8 @@ const Index = () => {
     return reserves.filter(r => r.date >= today).slice(0, 10);
   };
 
-  if (isLoadingData) return <div className="min-h-screen bg-ops-bg flex items-center justify-center text-ops-accent animate-pulse">Initializing Ops Deck...</div>;
 
-  const [editingEntry, setEditingEntry] = useState<FinancialEntry | null>(null);
+  // Entry Handlers
   const handleEditEntry = (entry: FinancialEntry) => setEditingEntry(entry);
   const handleCancelEdit = () => setEditingEntry(null);
   const handleSaveEdit = async (updated: FinancialEntry) => {
@@ -199,10 +202,11 @@ const Index = () => {
     }
   };
 
-  const [hiddenIds, setHiddenIds] = useState<string[]>([]);
   const toggleVisibility = (id: string) => {
     setHiddenIds(prev => prev.includes(id) ? prev.filter(h => h !== id) : [...prev, id]);
   };
+
+  if (isLoadingData) return <div className="min-h-screen bg-ops-bg flex items-center justify-center text-ops-accent animate-pulse">Initializing Ops Deck...</div>;
 
   return (
     <SidebarProvider>
