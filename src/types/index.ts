@@ -26,3 +26,8 @@ export interface CalendarDay {
   isCurrentMonth: boolean;
   isSelected: boolean;
 }
+
+export interface DashboardConfig {
+  startDate: Date | null;
+  startBalance: number;
+}

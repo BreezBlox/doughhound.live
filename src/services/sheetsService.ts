@@ -1,4 +1,4 @@
-import { FinancialEntry } from '@/types';
+import { FinancialEntry, DashboardConfig } from '@/types';
 
 // Google Sheets API base URL
 const SHEETS_API_BASE = 'https://sheets.googleapis.com/v4/spreadsheets';
@@ -319,7 +319,146 @@ export async function testSheetAccess(config: SheetsServiceConfig): Promise<bool
         );
 
         return response.ok;
-    } catch {
+    }
+}
+
+/**
+ * Fetch dashboard configuration (Forecast Start Date, Start Balance)
+ */
+export async function fetchDashboardSettings(config: SheetsServiceConfig): Promise<DashboardConfig> {
+    const { accessToken, sheetId } = config;
+
+    try {
+        // Try to read Dashboard!B3:B4
+        const response = await fetch(
+            `${SHEETS_API_BASE}/${sheetId}/values/Dashboard!B3:B4`,
+            {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                },
+            }
+        );
+
+        if (!response.ok) {
+            return { startDate: null, startBalance: 0 };
+        }
+
+        const data = await response.json();
+        const values = data.values; // [[DateString], [BalanceNumber]]
+
+        let startDate = null;
+        let startBalance = 0;
+
+        if (values && values.length >= 2) {
+            // First row (B3) is date
+            if (values[0][0]) startDate = new Date(values[0][0]);
+            // Second row (B4) is balance
+            if (values[1][0]) {
+                // Remove currency symbols if present
+                const cleanBalance = String(values[1][0]).replace(/[^0-9.-]+/g, "");
+                startBalance = parseFloat(cleanBalance) || 0;
+            }
+        }
+
+        return { startDate, startBalance };
+    } catch (error) {
+        console.error('Error fetching dashboard settings:', error);
+        return { startDate: null, startBalance: 0 };
+    }
+}
+
+/**
+ * Update dashboard configuration
+ */
+export async function updateDashboardSettings(config: SheetsServiceConfig, settings: DashboardConfig): Promise<boolean> {
+    const { accessToken, sheetId } = config;
+
+    try {
+        const formattedDate = settings.startDate ? settings.startDate.toISOString().split('T')[0] : '';
+
+        const response = await fetch(
+            `${SHEETS_API_BASE}/${sheetId}/values/Dashboard!B3:B4?valueInputOption=USER_ENTERED`,
+            {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    range: 'Dashboard!B3:B4',
+                    majorDimension: 'ROWS',
+                    values: [
+                        [formattedDate],
+                        [settings.startBalance]
+                    ],
+                }),
+            }
+        );
+
+        if (!response.ok) {
+            // If failed (likely sheet doesn't exist), create it
+            console.log("Dashboard update failed, attempting to create sheet...");
+
+            // Add 'Dashboard' sheet
+            await fetch(
+                `${SHEETS_API_BASE}/${sheetId}:batchUpdate`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        requests: [{
+                            addSheet: {
+                                properties: { title: 'Dashboard', index: 0, gridProperties: { rowCount: 10, columnCount: 5 } }
+                            }
+                        }]
+                    })
+                }
+            );
+
+            // Initialize headers
+            await fetch(
+                `${SHEETS_API_BASE}/${sheetId}/values/Dashboard!A1:A4?valueInputOption=USER_ENTERED`,
+                {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        range: 'Dashboard!A1:A4',
+                        majorDimension: 'COLUMNS',
+                        values: [['DoughFlow Settings', '', 'Forecast Start Date', 'Current Reserve Balance']]
+                    })
+                }
+            );
+
+            // Retry update path
+            await fetch(
+                `${SHEETS_API_BASE}/${sheetId}/values/Dashboard!B3:B4?valueInputOption=USER_ENTERED`,
+                {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        range: 'Dashboard!B3:B4',
+                        majorDimension: 'ROWS',
+                        values: [
+                            [formattedDate],
+                            [settings.startBalance]
+                        ],
+                    }),
+                }
+            );
+        }
+
+        return true;
+    } catch (error) {
+        console.error('Error updating dashboard settings:', error);
         return false;
     }
 }
