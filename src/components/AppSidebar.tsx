@@ -20,8 +20,20 @@ interface AppSidebarProps {
     toggleVisibility: (id: string) => void;
 }
 
+import { useState } from "react";
+import { LayoutGrid, FileText } from "lucide-react";
+import {
+    SidebarGroup,
+    SidebarGroupLabel,
+    SidebarGroupContent,
+    SidebarMenu,
+    SidebarMenuItem,
+    SidebarMenuButton
+} from "@/components/ui/sidebar"
+
 export function AppSidebar({ entries, onDeleteEntry, onEditEntry, editingEntryId, onSaveEdit, onCancelEdit, hiddenIds, toggleVisibility }: AppSidebarProps) {
     const { user, logout } = useAuth()
+    const [viewMode, setViewMode] = useState<'menu' | 'transactions'>('transactions');
 
     return (
         <Sidebar>
@@ -30,23 +42,64 @@ export function AppSidebar({ entries, onDeleteEntry, onEditEntry, editingEntryId
                 <h1 className="font-orbitron text-foreground text-xl tracking-widest font-bold">OPS DECK</h1>
             </SidebarHeader>
             <SidebarContent className="bg-ops-bg">
-                <div className="p-2 h-full flex flex-col">
-                    <div className="mb-2 px-2">
-                        <h3 className="font-mono text-xs tracking-widest text-muted-foreground">TRANSACTION LOG</h3>
-                    </div>
-                    <div className="flex-1 overflow-hidden">
-                        <EntryList
-                            entries={entries}
-                            onDeleteEntry={onDeleteEntry}
-                            onEditEntry={onEditEntry}
-                            editingEntryId={editingEntryId}
-                            onSaveEdit={onSaveEdit}
-                            onCancelEdit={onCancelEdit}
-                            hiddenIds={hiddenIds}
-                            toggleVisibility={toggleVisibility}
-                        />
-                    </div>
+                {/* Toggle Switch */}
+                <div className="p-4 pb-0 flex gap-1">
+                    <button
+                        onClick={() => setViewMode('menu')}
+                        className={`flex-1 py-2 text-[10px] font-mono tracking-widest border border-sidebar-border transition-colors flex items-center justify-center gap-2 ${viewMode === 'menu' ? 'bg-sidebar-accent text-white' : 'text-muted-foreground hover:bg-sidebar-accent/50'}`}
+                    >
+                        <LayoutGrid size={12} /> MODULES
+                    </button>
+                    <button
+                        onClick={() => setViewMode('transactions')}
+                        className={`flex-1 py-2 text-[10px] font-mono tracking-widest border border-sidebar-border transition-colors flex items-center justify-center gap-2 ${viewMode === 'transactions' ? 'bg-sidebar-accent text-white' : 'text-muted-foreground hover:bg-sidebar-accent/50'}`}
+                    >
+                        <FileText size={12} /> LOG
+                    </button>
                 </div>
+
+                {viewMode === 'menu' ? (
+                    // ORIGINAL MENU VIEW
+                    <SidebarGroup>
+                        <SidebarGroupLabel className="font-mono text-xs tracking-widest text-muted-foreground mt-4 mb-2">ACTIVE MODULES</SidebarGroupLabel>
+                        <SidebarGroupContent>
+                            <SidebarMenu>
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton isActive className="h-auto py-3 flex flex-col items-start gap-1 border-l-2 border-primary bg-sidebar-accent/50">
+                                        <span className="font-orbitron text-xs font-bold text-foreground">DOUGH_HOUND_V1</span>
+                                        <span className="font-mono text-[10px] text-primary">IN_PROGRESS</span>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton className="h-auto py-3 flex flex-col items-start gap-1 opacity-50 hover:opacity-100">
+                                        <span className="font-orbitron text-xs font-bold text-muted-foreground">QUIN_WORKFLOW</span>
+                                        <span className="font-mono text-[10px] text-muted-foreground">PENDING</span>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            </SidebarMenu>
+                        </SidebarGroupContent>
+                    </SidebarGroup>
+                ) : (
+                    // TRANSACTIONS VIEW
+                    <div className="p-2 h-full flex flex-col">
+                        <div className="mb-2 px-2 mt-4">
+                            <h3 className="font-mono text-xs tracking-widest text-muted-foreground">TRANSACTION LOG</h3>
+                        </div>
+                        <div className="flex-1 overflow-hidden">
+                            <EntryList
+                                entries={entries}
+                                onDeleteEntry={onDeleteEntry}
+                                onEditEntry={onEditEntry}
+                                editingEntryId={editingEntryId}
+                                onSaveEdit={onSaveEdit}
+                                onCancelEdit={onCancelEdit}
+                                hiddenIds={hiddenIds}
+                                toggleVisibility={toggleVisibility}
+                                compact={true}
+                            />
+                        </div>
+                    </div>
+                )}
             </SidebarContent>
             <SidebarFooter className="border-t border-sidebar-border p-4 bg-ops-bg">
                 {user && (

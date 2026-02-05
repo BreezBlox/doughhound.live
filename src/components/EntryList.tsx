@@ -18,9 +18,10 @@ interface EntryListProps {
   onCancelEdit?: () => void;
   hiddenIds: string[];
   toggleVisibility: (id: string) => void;
+  compact?: boolean;
 }
 
-const EntryList: React.FC<EntryListProps> = ({ entries, onDeleteEntry, onEditEntry, editingEntryId, onSaveEdit, onCancelEdit, hiddenIds, toggleVisibility }) => {
+const EntryList: React.FC<EntryListProps> = ({ entries, onDeleteEntry, onEditEntry, editingEntryId, onSaveEdit, onCancelEdit, hiddenIds, toggleVisibility, compact }) => {
   const [activeTab, setActiveTab] = useState<'bills' | 'paychecks' | 'all'>('all');
 
   // For log display, show all, but for graph/export, exclude hidden
@@ -39,19 +40,19 @@ const EntryList: React.FC<EntryListProps> = ({ entries, onDeleteEntry, onEditEnt
           className={`px-3 py-1 text-sm font-orbitron ${activeTab === 'all' ? 'bg-mgs-green text-mgs-black' : 'bg-mgs-darkgray text-mgs-lightgray'}`}
           onClick={() => setActiveTab('all')}
         >
-          All Entries
+          {compact ? 'All' : 'All Entries'}
         </button>
         <button
           className={`px-3 py-1 text-sm font-orbitron ${activeTab === 'bills' ? 'bg-mgs-green text-mgs-black' : 'bg-mgs-darkgray text-mgs-lightgray'}`}
           onClick={() => setActiveTab('bills')}
         >
-          Expenditures
+          {compact ? 'Exp.' : 'Expenditures'}
         </button>
         <button
           className={`px-3 py-1 text-sm font-orbitron ${activeTab === 'paychecks' ? 'bg-mgs-green text-mgs-black' : 'bg-mgs-darkgray text-mgs-lightgray'}`}
           onClick={() => setActiveTab('paychecks')}
         >
-          Acquisitions
+          {compact ? 'Inc.' : 'Acquisitions'}
         </button>
       </div>
 
@@ -124,6 +125,7 @@ const EntryList: React.FC<EntryListProps> = ({ entries, onDeleteEntry, onEditEnt
                       editMode={true}
                       onSave={(updated) => onSaveEdit && onSaveEdit(updated)}
                       onCancel={onCancelEdit}
+                      selectedDate={new Date()}
                     />
                   )}
                   {entry.type === 'paycheck' && (
@@ -132,6 +134,7 @@ const EntryList: React.FC<EntryListProps> = ({ entries, onDeleteEntry, onEditEnt
                       editMode={true}
                       onSave={(updated) => onSaveEdit && onSaveEdit(updated)}
                       onCancel={onCancelEdit}
+                      selectedDate={new Date()}
                     />
                   )}
                   {entry.type === 'purchase' && (
@@ -140,6 +143,7 @@ const EntryList: React.FC<EntryListProps> = ({ entries, onDeleteEntry, onEditEnt
                       editMode={true}
                       onSave={(updated) => onSaveEdit && onSaveEdit(updated)}
                       onCancel={onCancelEdit}
+                      selectedDate={new Date()}
                     />
                   )}
                 </div>
