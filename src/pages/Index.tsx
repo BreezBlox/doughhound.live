@@ -312,8 +312,8 @@ const Index = () => {
           </div>
 
           {/* Header */}
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-end border-b border-ops-border pb-6 gap-4">
-            <div>
+          <div className="flex flex-col md:flex-row justify-end items-end border-b border-ops-border pb-6 gap-8">
+            <div className="text-right">
               <h1 className="text-3xl font-orbitron font-bold text-ops-accent mb-1 tracking-wider">Dough Hound</h1>
               <p className="text-ops-dim font-mono text-sm">Reserve Balance Forecaster</p>
             </div>
@@ -322,7 +322,14 @@ const Index = () => {
                 <div className="text-[10px] font-mono text-ops-dim uppercase tracking-widest mb-1">Current Reserve</div>
                 <div className="flex items-center justify-end gap-2 group cursor-pointer" onClick={() => setShowReconcileDialog(true)}>
                   <span className="text-3xl font-orbitron font-bold text-white group-hover:text-ops-accent transition-colors">
-                    ${reserves[0]?.reserve.toFixed(2) || "0.00"}
+                    ${(() => {
+                      // Find reserve for TODAY
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+                      const todayReserve = reserves.find(r => r.date.getTime() === today.getTime());
+                      // Fallback to first if not found (e.g. range starts in future?), or 0
+                      return (todayReserve?.reserve ?? reserves[0]?.reserve ?? 0).toFixed(2);
+                    })()}
                   </span>
                   <Edit2 size={14} className="text-ops-dim group-hover:text-ops-accent" />
                 </div>
