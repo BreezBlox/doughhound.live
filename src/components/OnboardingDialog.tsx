@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "./ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "./ui/dialog";
 import { Button } from "./ui/button";
 
 const onboardingSteps = [
@@ -84,6 +84,9 @@ const OnboardingDialog = ({ open, onClose }: { open: boolean; onClose: () => voi
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>{onboardingSteps[step].title}</DialogTitle>
+          <DialogDescription className="sr-only">
+            Step {step + 1} of {onboardingSteps.length}: {onboardingSteps[step].title}
+          </DialogDescription>
         </DialogHeader>
         <div className="py-2" style={{ color: '#000' }}>{onboardingSteps[step].content}</div>
         <DialogFooter className="flex justify-between mt-4">

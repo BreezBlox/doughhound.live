@@ -10,7 +10,7 @@ import * as sheetsService from "@/services/sheetsService";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Progress } from "@/components/ui/progress";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -95,7 +95,12 @@ const Index = () => {
           setEntries(loadedEntries);
           setDashboardConfig(loadedConfig);
         } catch (error) {
-          console.error('Failed to load data:', error);
+          if (error instanceof sheetsService.AuthError) {
+            console.warn("Session expired during load:", error);
+            logout(); // Force logout to clear invalid state
+          } else {
+            console.error('Failed to load data:', error);
+          }
         } finally {
           setIsLoadingData(false);
         }
@@ -539,6 +544,9 @@ const Index = () => {
             <DialogContent className="bg-ops-card border-ops-accent text-white font-mono">
               <DialogHeader>
                 <DialogTitle className="font-orbitron text-ops-accent">SYNC ANCHOR POINT</DialogTitle>
+                <DialogDescription className="sr-only">
+                  Set your current bank balance to anchor future forecasts.
+                </DialogDescription>
               </DialogHeader>
               <div className="py-4 space-y-4">
                 <p className="text-xs text-ops-dim">
