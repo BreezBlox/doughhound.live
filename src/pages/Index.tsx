@@ -221,7 +221,15 @@ const Index = () => {
         toggleVisibility={toggleVisibility}
       />
       <SidebarInset>
-        <div className="flex flex-col h-full bg-ops-bg text-ops-text p-4 lg:p-8 gap-6 overflow-y-auto">
+        <div className="flex flex-col h-full bg-ops-bg text-ops-text p-4 lg:p-8 gap-6 overflow-y-auto relative">
+
+          {/* Custom Sidebar Toggle "Tab" */}
+          <div className="absolute top-4 left-4 z-50 md:hidden">
+            <SidebarTrigger className="bg-ops-accent text-ops-bg p-2 rounded-r-md shadow-lg" />
+          </div>
+          <div className="hidden md:block absolute top-1/2 -left-3 z-50">
+            <SidebarTrigger className="bg-ops-accent text-ops-bg p-2 h-12 w-6 rounded-r-md shadow-[0_0_15px_rgba(14,165,233,0.3)] hover:w-8 transition-all flex items-center justify-center cursor-pointer border border-l-0 border-ops-accent" />
+          </div>
 
           {/* Header */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-end border-b border-ops-border pb-6 gap-4">
