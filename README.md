@@ -1,73 +1,51 @@
-# Welcome to your Daily Dough Flow project
+# Dough Hound - Tactical Finance
 
-## Project info
+A personal finance tracking app that stores your data in your own Google Sheet.
 
-**URL**: https://daily-dough-flow.dev/projects/f6150afb-b3e8-4dea-8bb0-3066a629f0f9
+## Features
 
-## How can I edit this code?
+- 📊 Track bills, paychecks, and purchases
+- 📈 Visualize your financial forecast
+- 🔐 Google OAuth authentication
+- 📝 Your data stays in your own Google Sheet
+- 🔄 Recurring transaction support
 
-There are several ways of editing your application.
+## Tech Stack
 
-**Use Daily Dough Flow**
+- React + TypeScript + Vite
+- Tailwind CSS + shadcn/ui
+- Google OAuth 2.0
+- Google Sheets API
 
-Simply visit the [Daily Dough Flow Project](https://daily-dough-flow.dev/projects/f6150afb-b3e8-4dea-8bb0-3066a629f0f9) and start prompting.
+## Local Development
 
-Changes made via Daily Dough Flow will be committed automatically to this repo.
+```bash
+# Install dependencies
+npm install
 
-**Use your preferred IDE**
+# Create .env file with your Google Client ID
+cp .env.example .env.local
+# Edit .env.local with your VITE_GOOGLE_CLIENT_ID
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Daily Dough Flow.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start dev server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## Deployment
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+Deploy to Vercel:
 
-**Use GitHub Codespaces**
+1. Import this repo in Vercel
+2. Add environment variable: `VITE_GOOGLE_CLIENT_ID`
+3. Deploy
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Google Cloud Setup
 
-## What technologies are used for this project?
+1. Create a project at [console.cloud.google.com](https://console.cloud.google.com)
+2. Enable Google Sheets API
+3. Create OAuth 2.0 credentials (Web application)
+4. Add your domains to Authorized JavaScript origins
 
-This project is built with:
+---
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Daily Dough Flow](https://daily-dough-flow.dev/projects/f6150afb-b3e8-4dea-8bb0-3066a629f0f9) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Daily Dough Flow project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.daily-dough-flow.dev/tips-tricks/custom-domain#step-by-step-guide)
+Built by [BreezBlox](https://breezblox.com)
