@@ -179,12 +179,43 @@ const Index = () => {
     return reserves.filter(r => r.date >= today).slice(0, 10);
   };
 
-  if (!user?.sheetId) return <SheetSetup onComplete={() => window.location.reload()} />;
   if (isLoadingData) return <div className="min-h-screen bg-ops-bg flex items-center justify-center text-ops-accent animate-pulse">Initializing Ops Deck...</div>;
+
+  const [editingEntry, setEditingEntry] = useState<FinancialEntry | null>(null);
+  const handleEditEntry = (entry: FinancialEntry) => setEditingEntry(entry);
+  const handleCancelEdit = () => setEditingEntry(null);
+  const handleSaveEdit = async (updated: FinancialEntry) => {
+    setEntries(prev => prev.map(e => e.id === updated.id ? updated : e));
+    setEditingEntry(null);
+    if (user?.sheetId && accessToken) {
+      await sheetsService.updateEntry({ accessToken, sheetId: user.sheetId }, updated);
+    }
+  };
+  const handleDeleteEntry = async (id: string) => {
+    setEntries(prevEntries => prevEntries.filter(entry => entry.id !== id));
+    if (editingEntry && editingEntry.id === id) setEditingEntry(null);
+    if (user?.sheetId && accessToken) {
+      await sheetsService.deleteEntry({ accessToken, sheetId: user.sheetId }, id);
+    }
+  };
+
+  const [hiddenIds, setHiddenIds] = useState<string[]>([]);
+  const toggleVisibility = (id: string) => {
+    setHiddenIds(prev => prev.includes(id) ? prev.filter(h => h !== id) : [...prev, id]);
+  };
 
   return (
     <SidebarProvider>
-      <AppSidebar />
+      <AppSidebar
+        entries={entries}
+        onDeleteEntry={handleDeleteEntry}
+        onEditEntry={handleEditEntry}
+        editingEntryId={editingEntry?.id}
+        onSaveEdit={handleSaveEdit}
+        onCancelEdit={handleCancelEdit}
+        hiddenIds={hiddenIds}
+        toggleVisibility={toggleVisibility}
+      />
       <SidebarInset>
         <div className="flex flex-col h-full bg-ops-bg text-ops-text p-4 lg:p-8 gap-6 overflow-y-auto">
 
