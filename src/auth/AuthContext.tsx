@@ -66,6 +66,18 @@ const safeJsonParse = (value: string | null) => {
   }
 };
 
+const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> => {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await new Promise<T>((resolve, reject) => {
+      timeoutId = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+      promise.then(resolve, reject);
+    });
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+};
+
 interface AuthProviderProps {
   children: ReactNode;
 }
@@ -114,11 +126,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
 
         let sheetId = localSheetId;
-        const remoteSheetId = await fetchProfileSheetId(userId);
+        let remoteSheetId: string | null = null;
+        try {
+          remoteSheetId = await withTimeout(fetchProfileSheetId(userId), 4000, 'Profile fetch');
+        } catch (error) {
+          console.warn('Profile fetch failed or timed out:', error);
+        }
+
         if (remoteSheetId) {
           sheetId = remoteSheetId;
         } else if (localSheetId) {
-          await upsertProfileSheetId(userId, localSheetId);
+          try {
+            await withTimeout(upsertProfileSheetId(userId, localSheetId), 4000, 'Profile upsert');
+          } catch (error) {
+            console.warn('Profile upsert failed or timed out:', error);
+          }
         }
 
         const appUser: AppUser = {
