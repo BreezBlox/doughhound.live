@@ -14,12 +14,10 @@ export async function fetchProfileSheetId(userId: string): Promise<string | null
     .from('profiles')
     .select('sheet_id')
     .eq('user_id', userId)
-    .single();
+    .maybeSingle();
 
   if (error) {
-    if (error.code !== 'PGRST116') {
-      console.warn('Supabase profile fetch failed:', error.message);
-    }
+    console.warn('Supabase profile fetch failed:', error.message);
     return null;
   }
 

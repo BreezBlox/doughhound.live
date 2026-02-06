@@ -58,7 +58,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const metadata = sessionUser.user_metadata ?? {};
       const userId = sessionUser.id;
 
-      const storedLocal = localStorage.getItem(`doughhound_userdata_${userId}`);
+      const providerSub = metadata.sub || metadata.provider_id || userId;
+      const storedLocal = localStorage.getItem(`doughhound_userdata_${userId}`) || localStorage.getItem(`doughhound_userdata_${providerSub}`);
       const localSheetId = storedLocal ? JSON.parse(storedLocal).sheetId : undefined;
 
       let sheetId = localSheetId;
@@ -127,7 +128,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setUser(updatedUser);
       localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updatedUser));
       // Also save to user-specific storage for persistence across logins
-      const localUserKey = supabaseUserId ?? user.sub;
+      const resolvedUserId = supabaseUserId ?? await getSupabaseUserId();
+      const localUserKey = resolvedUserId ?? user.sub;
       localStorage.setItem(`doughhound_userdata_${localUserKey}`, JSON.stringify({ sheetId }));
 
       const userId = supabaseUserId ?? await getSupabaseUserId();
