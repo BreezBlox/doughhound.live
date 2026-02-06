@@ -31,6 +31,41 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const USER_STORAGE_KEY = 'doughhound_user';
 const TOKEN_STORAGE_KEY = 'doughhound_token';
 
+const safeStorageGet = (key: string) => {
+  try {
+    return localStorage.getItem(key);
+  } catch (error) {
+    console.warn('Local storage read failed:', error);
+    return null;
+  }
+};
+
+const safeStorageSet = (key: string, value: string) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch (error) {
+    console.warn('Local storage write failed:', error);
+  }
+};
+
+const safeStorageRemove = (key: string) => {
+  try {
+    localStorage.removeItem(key);
+  } catch (error) {
+    console.warn('Local storage remove failed:', error);
+  }
+};
+
+const safeJsonParse = (value: string | null) => {
+  if (!value) return null;
+  try {
+    return JSON.parse(value);
+  } catch (error) {
+    console.warn('Local storage JSON parse failed:', error);
+    return null;
+  }
+};
+
 interface AuthProviderProps {
   children: ReactNode;
 }
@@ -44,55 +79,83 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Load user from storage on mount
   useEffect(() => {
     const applySession = async (session: Session | null) => {
-      if (!session) {
+      try {
+        if (!session) {
+          setUser(null);
+          setAccessToken(null);
+          setSupabaseUserId(null);
+          safeStorageRemove(USER_STORAGE_KEY);
+          safeStorageRemove(TOKEN_STORAGE_KEY);
+          return;
+        }
+
+        const { user: sessionUser, provider_token } = session;
+        const storedToken = safeStorageGet(TOKEN_STORAGE_KEY);
+        const effectiveToken = provider_token || storedToken || null;
+        const metadata = sessionUser.user_metadata ?? {};
+        const userId = sessionUser.id;
+
+        const providerSub = metadata.sub || metadata.provider_id || userId;
+        const localKeys = [
+          `doughhound_userdata_${userId}`,
+          `doughhound_userdata_${providerSub}`,
+        ];
+
+        let localSheetId: string | undefined;
+        for (const key of localKeys) {
+          const storedLocal = safeStorageGet(key);
+          if (!storedLocal) continue;
+          const parsed = safeJsonParse(storedLocal);
+          if (parsed?.sheetId) {
+            localSheetId = parsed.sheetId;
+            break;
+          }
+          safeStorageRemove(key);
+        }
+
+        let sheetId = localSheetId;
+        const remoteSheetId = await fetchProfileSheetId(userId);
+        if (remoteSheetId) {
+          sheetId = remoteSheetId;
+        } else if (localSheetId) {
+          await upsertProfileSheetId(userId, localSheetId);
+        }
+
+        const appUser: AppUser = {
+          email: sessionUser.email || metadata.email || '',
+          name: metadata.full_name || metadata.name || sessionUser.email || 'Operator',
+          picture: metadata.avatar_url || metadata.picture || '',
+          sub: metadata.sub || metadata.provider_id || userId,
+          sheetId,
+        };
+
+        setSupabaseUserId(userId);
+        setUser(appUser);
+        setAccessToken(effectiveToken);
+        safeStorageSet(USER_STORAGE_KEY, JSON.stringify(appUser));
+        if (provider_token) {
+          safeStorageSet(TOKEN_STORAGE_KEY, provider_token);
+        }
+      } catch (error) {
+        console.warn('Auth session apply failed:', error);
         setUser(null);
         setAccessToken(null);
         setSupabaseUserId(null);
-        localStorage.removeItem(USER_STORAGE_KEY);
-        localStorage.removeItem(TOKEN_STORAGE_KEY);
+        safeStorageRemove(USER_STORAGE_KEY);
+        safeStorageRemove(TOKEN_STORAGE_KEY);
+      } finally {
         setIsLoading(false);
-        return;
       }
-
-      const { user: sessionUser, provider_token } = session;
-      const storedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
-      const effectiveToken = provider_token || storedToken || null;
-      const metadata = sessionUser.user_metadata ?? {};
-      const userId = sessionUser.id;
-
-      const providerSub = metadata.sub || metadata.provider_id || userId;
-      const storedLocal = localStorage.getItem(`doughhound_userdata_${userId}`) || localStorage.getItem(`doughhound_userdata_${providerSub}`);
-      const localSheetId = storedLocal ? JSON.parse(storedLocal).sheetId : undefined;
-
-      let sheetId = localSheetId;
-      const remoteSheetId = await fetchProfileSheetId(userId);
-      if (remoteSheetId) {
-        sheetId = remoteSheetId;
-      } else if (localSheetId) {
-        await upsertProfileSheetId(userId, localSheetId);
-      }
-
-      const appUser: AppUser = {
-        email: sessionUser.email || metadata.email || '',
-        name: metadata.full_name || metadata.name || sessionUser.email || 'Operator',
-        picture: metadata.avatar_url || metadata.picture || '',
-        sub: metadata.sub || metadata.provider_id || userId,
-        sheetId,
-      };
-
-      setSupabaseUserId(userId);
-      setUser(appUser);
-      setAccessToken(effectiveToken);
-      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(appUser));
-      if (provider_token) {
-        localStorage.setItem(TOKEN_STORAGE_KEY, provider_token);
-      }
-      setIsLoading(false);
     };
 
     const init = async () => {
-      const { data } = await supabase.auth.getSession();
-      await applySession(data.session);
+      try {
+        const { data } = await supabase.auth.getSession();
+        await applySession(data.session);
+      } catch (error) {
+        console.warn('Supabase session load failed:', error);
+        setIsLoading(false);
+      }
     };
 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
@@ -120,8 +183,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const logout = async () => {
     setUser(null);
     setAccessToken(null);
-    localStorage.removeItem(USER_STORAGE_KEY);
-    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    safeStorageRemove(USER_STORAGE_KEY);
+    safeStorageRemove(TOKEN_STORAGE_KEY);
     setSupabaseUserId(null);
     await supabase.auth.signOut();
   };
@@ -130,11 +193,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (user) {
       const updatedUser = { ...user, sheetId };
       setUser(updatedUser);
-      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updatedUser));
+      safeStorageSet(USER_STORAGE_KEY, JSON.stringify(updatedUser));
       // Also save to user-specific storage for persistence across logins
       const resolvedUserId = supabaseUserId ?? await getSupabaseUserId();
       const localUserKey = resolvedUserId ?? user.sub;
-      localStorage.setItem(`doughhound_userdata_${localUserKey}`, JSON.stringify({ sheetId }));
+      safeStorageSet(`doughhound_userdata_${localUserKey}`, JSON.stringify({ sheetId }));
 
       const userId = supabaseUserId ?? await getSupabaseUserId();
       if (userId) {
