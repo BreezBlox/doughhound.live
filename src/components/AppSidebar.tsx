@@ -29,7 +29,7 @@ import {
     SidebarMenuButton
 } from "@/components/ui/sidebar"
 
-export function AppSidebar({ entries, onDeleteEntry, onEditEntry, editingEntryId, onSaveEdit, onCancelEdit, hiddenIds, toggleVisibility }: AppSidebarProps) {
+export function AppSidebar({ entries, onDeleteEntry, onEditEntry, editingEntryId, onSaveEdit, onCancelEdit, hiddenIds, toggleVisibility, onShowTutorial }: AppSidebarProps) {
     const { user, logout } = useAuth()
 
     return (

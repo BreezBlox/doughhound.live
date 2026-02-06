@@ -316,7 +316,6 @@ const Index = () => {
         onSaveEdit={handleSaveEdit}
         onCancelEdit={handleCancelEdit}
         hiddenIds={hiddenIds}
-        hiddenIds={hiddenIds}
         toggleVisibility={toggleVisibility}
         onShowTutorial={() => setShowOnboarding(true)}
       />
