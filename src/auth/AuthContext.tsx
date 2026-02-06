@@ -172,7 +172,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const init = async () => {
       try {
-        const { data } = await supabase.auth.getSession();
+        const { data } = await withTimeout(supabase.auth.getSession(), 4000, 'Session load');
         await applySession(data.session);
       } catch (error) {
         console.warn('Supabase session load failed:', error);
