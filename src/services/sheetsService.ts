@@ -446,6 +446,8 @@ export async function fetchDashboardSettings(config: SheetsServiceConfig): Promi
         }
 
         if (!response.ok) {
+            // It's normal for the Dashboard sheet to not exist initially
+            // console.warn('Dashboard sheet not found, using defaults.');
             return { startDate: null, startBalance: 0 };
         }
 
