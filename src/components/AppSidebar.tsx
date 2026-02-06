@@ -64,9 +64,10 @@ export function AppSidebar({ entries, onDeleteEntry, onEditEntry, editingEntryId
                                 <span className="text-[10px] text-muted-foreground truncate">{user.email}</span>
                             </div>
                         </div>
-                        <div className="text-[9px] font-mono text-ops-dim text-center break-all">
-                            ID: {user.sheetId.slice(-6)}
-                        </div>
+                        {user.sheetId && (
+                            <div className="text-[9px] font-mono text-ops-dim text-center break-all">
+                                ID: {user.sheetId.slice(-6)}
+                            </div>
                         )}
                         <button
                             onClick={onShowTutorial}
