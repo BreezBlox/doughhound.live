@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/services/supabaseClient';
 import { fetchProfileSheetId, getSupabaseUserId, upsertProfileSheetId } from '@/services/profileService';
@@ -66,6 +66,14 @@ const safeJsonParse = (value: string | null) => {
   }
 };
 
+const logAuthStage = (stage: string, details?: Record<string, unknown>) => {
+  if (details) {
+    console.info('[auth]', stage, details);
+    return;
+  }
+  console.info('[auth]', stage);
+};
+
 const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> => {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -87,11 +95,30 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [supabaseUserId, setSupabaseUserId] = useState<string | null>(null);
+  const isLoadingRef = useRef(isLoading);
+
+  useEffect(() => {
+    isLoadingRef.current = isLoading;
+  }, [isLoading]);
 
   // Load user from storage on mount
   useEffect(() => {
+    logAuthStage('init:mount');
+    const loadTimeoutId = window.setTimeout(() => {
+      if (!isLoadingRef.current) {
+        return;
+      }
+      console.warn('[auth] init timeout; forcing unauthenticated state');
+      setUser(null);
+      setAccessToken(null);
+      setSupabaseUserId(null);
+      setIsLoading(false);
+    }, 8000);
+
     const applySession = async (session: Session | null) => {
+      const hasSession = Boolean(session);
       try {
+        logAuthStage('applySession:start', { hasSession });
         if (!session) {
           setUser(null);
           setAccessToken(null);
@@ -166,13 +193,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
         safeStorageRemove(USER_STORAGE_KEY);
         safeStorageRemove(TOKEN_STORAGE_KEY);
       } finally {
+        logAuthStage('applySession:done', { hasSession });
         setIsLoading(false);
       }
     };
 
     const init = async () => {
       try {
+        logAuthStage('init:start');
         const { data } = await withTimeout(supabase.auth.getSession(), 4000, 'Session load');
+        logAuthStage('init:session', { hasSession: Boolean(data.session) });
         await applySession(data.session);
       } catch (error) {
         console.warn('Supabase session load failed:', error);
@@ -181,12 +211,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      logAuthStage('authStateChange', { hasSession: Boolean(session) });
       await applySession(session);
     });
 
     init();
 
     return () => {
+      window.clearTimeout(loadTimeoutId);
       authListener?.subscription.unsubscribe();
     };
   }, []);
