@@ -316,7 +316,9 @@ const Index = () => {
         onSaveEdit={handleSaveEdit}
         onCancelEdit={handleCancelEdit}
         hiddenIds={hiddenIds}
+        hiddenIds={hiddenIds}
         toggleVisibility={toggleVisibility}
+        onShowTutorial={() => setShowOnboarding(true)}
       />
       <SidebarInset>
         <div className="flex flex-col h-full bg-ops-bg text-ops-text p-4 lg:p-8 gap-6 overflow-y-auto relative">
