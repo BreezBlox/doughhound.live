@@ -1,4 +1,3 @@
-import { useGoogleLogin } from '@react-oauth/google';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/auth/AuthContext';
 
@@ -16,17 +15,9 @@ export default function Login() {
         return null;
     }
 
-    const googleLogin = useGoogleLogin({
-        onSuccess: async (tokenResponse) => {
-            await login({
-                accessToken: tokenResponse.access_token,
-                idToken: tokenResponse.id_token,
-            });
-            navigate(from, { replace: true });
-        },
-        onError: errorResponse => console.error('Login Failed:', errorResponse),
-        scope: 'openid email profile https://www.googleapis.com/auth/spreadsheets',
-    });
+    const handleLogin = async () => {
+        await login();
+    };
 
     return (
         <div className="min-h-screen bg-mgs-black flex flex-col items-center justify-center p-4">
@@ -60,7 +51,7 @@ export default function Login() {
                 {/* Custom Google Sign-In Button */}
                 <div className="flex justify-center mb-6">
                     <button
-                        onClick={() => googleLogin()}
+                        onClick={handleLogin}
                         className="flex items-center gap-3 bg-white text-gray-900 px-6 py-3 rounded shadow hover:bg-gray-100 transition-colors font-medium text-sm font-sans"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" className="w-5 h-5">
