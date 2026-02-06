@@ -55,6 +55,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
       const { user: sessionUser, provider_token } = session;
+      const storedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
+      const effectiveToken = provider_token || storedToken || null;
       const metadata = sessionUser.user_metadata ?? {};
       const userId = sessionUser.id;
 
@@ -80,9 +82,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       setSupabaseUserId(userId);
       setUser(appUser);
-      setAccessToken(provider_token ?? null);
+      setAccessToken(effectiveToken);
       localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(appUser));
-      localStorage.setItem(TOKEN_STORAGE_KEY, provider_token ?? '');
+      if (provider_token) {
+        localStorage.setItem(TOKEN_STORAGE_KEY, provider_token);
+      }
       setIsLoading(false);
     };
 
