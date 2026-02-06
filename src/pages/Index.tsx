@@ -26,6 +26,19 @@ const Index = () => {
   const { user, accessToken, logout } = useAuth();
   const [showOnboarding, setShowOnboarding] = useState(false);
 
+  // Check if onboarding is needed
+  useEffect(() => {
+    const hasSeenOnboarding = localStorage.getItem('doughhound_onboarding_completed');
+    if (!hasSeenOnboarding && user?.sheetId) {
+      setShowOnboarding(true);
+    }
+  }, [user?.sheetId]);
+
+  const handleCloseOnboarding = () => {
+    localStorage.setItem('doughhound_onboarding_completed', 'true');
+    setShowOnboarding(false);
+  };
+
   // Data State
   const [entries, setEntries] = useState<FinancialEntry[]>([]);
   const [reserves, setReserves] = useState<DailyReserve[]>([]);
@@ -307,6 +320,8 @@ const Index = () => {
       />
       <SidebarInset>
         <div className="flex flex-col h-full bg-ops-bg text-ops-text p-4 lg:p-8 gap-6 overflow-y-auto relative">
+
+          <OnboardingDialog open={showOnboarding} onClose={handleCloseOnboarding} />
 
           {/* Custom Sidebar Toggle "Tab" */}
           <div className="absolute top-4 left-4 z-50 md:hidden">

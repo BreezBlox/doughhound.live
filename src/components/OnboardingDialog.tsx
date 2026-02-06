@@ -4,75 +4,84 @@ import { Button } from "./ui/button";
 
 const onboardingSteps = [
   {
-    title: "Welcome to Daily Dough Flow!",
+    title: "Welcome to Daily Dough Flow",
     content: (
-      <>
-        <p className="mb-2" style={{ color: '#000' }}>Welcome! This app helps you forecast, visualize, and manage your finances with tactical precision.</p>
-        <ul className="list-disc ml-5 text-sm" style={{ color: '#000' }}>
-          <li style={{ color: '#000' }}>Log bills, paychecks, and purchases with one click</li>
-          <li style={{ color: '#000' }}>Track recurring, one-time, and custom-date entries</li>
-          <li style={{ color: '#000' }}>Visualize your financial reserve over time</li>
+      <div className="space-y-4">
+        <p className="text-ops-text leading-relaxed">
+          Welcome, Operator. This dashboard gives you <span className="text-ops-accent font-bold">tactical visibility</span> into your financial runway.
+        </p>
+        <ul className="space-y-2">
+          <li className="flex items-start gap-2 text-sm text-ops-dim">
+            <span className="text-ops-accent mt-1">▶</span>
+            <span>Forecast your exact balance 30-90 days out.</span>
+          </li>
+          <li className="flex items-start gap-2 text-sm text-ops-dim">
+            <span className="text-ops-accent mt-1">▶</span>
+            <span>Catch negative drift before it happens.</span>
+          </li>
         </ul>
-      </>
+      </div>
     ),
   },
   {
-    title: "Adding & Editing Entries",
+    title: "Google Sheets Sync",
     content: (
-      <>
-        <p className="mb-2" style={{ color: '#000' }}>Use the forms to add expenditures (bills/purchases) and acquisitions (paychecks):</p>
-        <ul className="list-disc ml-5 text-sm" style={{ color: '#000' }}>
-          <li style={{ color: '#000' }}>Choose one-time or recurring schedules for any entry</li>
-          <li style={{ color: '#000' }}>Set limits or stop dates for recurrences, or pick multiple custom dates</li>
-          <li style={{ color: '#000' }}>Edit or delete any entry by clicking the pencil or trash icon</li>
-        </ul>
-      </>
+      <div className="space-y-4">
+        <p className="text-ops-text leading-relaxed">
+          Your data is yours. We sync directly to your personal Google Sheet in real-time.
+        </p>
+        <div className="bg-ops-bg border border-ops-border p-3 rounded text-xs font-mono text-ops-success">
+          <span className="text-ops-dim">STATUS:</span> ENCRYPTED_UPLINK_ESTABLISHED
+        </div>
+        <p className="text-xs text-ops-dim">
+          If you refresh, your data persists. If you edit the sheet directly, the dashboard updates.
+        </p>
+      </div>
     ),
   },
   {
-    title: "Understanding the Graph & Log",
+    title: "Tactical Controls",
     content: (
-      <>
-        <p className="mb-2" style={{ color: '#000' }}>The graph shows your projected reserve over time, based on all visible entries. The log lists every entry and its dates.</p>
-        <ul className="list-disc ml-5 text-sm" style={{ color: '#000' }}>
-          <li style={{ color: '#000' }}>Red = expenditures, Green = paychecks, Yellow = purchases</li>
-          <li style={{ color: '#000' }}>All recurring and custom dates are included</li>
+      <div className="space-y-4">
+        <p className="text-ops-text">
+          Use the <span className="font-bold text-ops-accent">Quick Add</span> panel to log operations:
+        </p>
+        <ul className="space-y-2 text-sm text-ops-dim">
+          <li className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-red-500"></span>
+            <span><strong className="text-ops-text">Expenditures</strong> (Bills/Expenses)</span>
+          </li>
+          <li className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-green-500"></span>
+            <span><strong className="text-ops-text">Acquisitions</strong> (Paychecks/Deposit)</span>
+          </li>
         </ul>
-      </>
+        <p className="text-xs text-ops-dim italic border-l-2 border-ops-accent pl-2">
+          Tip: Set a "Limit" on recurring bills to automatically stop them after X payments (e.g., AfterPay).
+        </p>
+      </div>
     ),
   },
   {
-    title: "Hide/Show Entries for Scenario Planning",
+    title: "Scenario Planning",
     content: (
-      <>
-        <p className="mb-2" style={{ color: '#000' }}>Experiment with different financial routes using the new toggle feature:</p>
-        <ul className="list-disc ml-5 text-sm" style={{ color: '#000' }}>
-          <li style={{ color: '#000' }}>Click the eye icon next to any entry in the Operations Log to hide or show it</li>
-          <li style={{ color: '#000' }}>Hidden entries are dimmed in the log and excluded from the forecast graph and export</li>
-          <li style={{ color: '#000' }}>Mix and match visible entries to instantly analyze different financial scenarios</li>
+      <div className="space-y-4">
+        <p className="text-ops-text">
+          Run simulations by toggling entries on/off.
+        </p>
+        <ul className="space-y-2 text-sm text-ops-dim">
+          <li className="flex items-start gap-2">
+            <span className="text-ops-accent font-bold">👁</span>
+            <span>Click the eye icon to hide an entry without deleting it.</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-ops-accent font-bold">⚡</span>
+            <span>The graph updates instantly to show your new runway.</span>
+          </li>
         </ul>
-      </>
+      </div>
     ),
-  },
-  {
-    title: "Pro Tips",
-    content: (
-      <>
-        <ul className="list-disc ml-5 text-sm" style={{ color: '#000' }}>
-          <li style={{ color: '#000' }}>Add to your phone home screen for a native app feel (PWA!)</li>
-          <li style={{ color: '#000' }}>Export or import logs via CSV for backup or bulk editing</li>
-        </ul>
-      </>
-    ),
-  },
-  {
-    title: "You're Ready!",
-    content: (
-      <>
-        <p className="mb-2" style={{ color: '#000' }}>Dive in and start tracking your dough. You can always revisit this guide from the menu.</p>
-      </>
-    ),
-  },
+  }
 ];
 
 const OnboardingDialog = ({ open, onClose }: { open: boolean; onClose: () => void }) => {
@@ -81,22 +90,46 @@ const OnboardingDialog = ({ open, onClose }: { open: boolean; onClose: () => voi
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md bg-ops-card border-ops-accent/30 text-ops-text">
         <DialogHeader>
-          <DialogTitle>{onboardingSteps[step].title}</DialogTitle>
-          <DialogDescription className="sr-only">
-            Step {step + 1} of {onboardingSteps.length}: {onboardingSteps[step].title}
+          <DialogTitle className="font-orbitron tracking-wider text-ops-accent text-xl">
+            {onboardingSteps[step].title}
+          </DialogTitle>
+          <DialogDescription className="text-xs font-mono text-ops-dim uppercase">
+            Briefing Phase {step + 1} / {onboardingSteps.length}
           </DialogDescription>
         </DialogHeader>
-        <div className="py-2" style={{ color: '#000' }}>{onboardingSteps[step].content}</div>
-        <DialogFooter className="flex justify-between mt-4">
-          <Button variant="ghost" onClick={onClose}>Skip</Button>
-          <div>
-            {step > 0 && <Button variant="ghost" onClick={() => setStep(step - 1)}>Back</Button>}
+
+        <div className="py-4 min-h-[160px] flex flex-col justify-center">
+          {onboardingSteps[step].content}
+        </div>
+
+        <DialogFooter className="flex justify-between items-center mt-4 border-t border-ops-border pt-4">
+          <Button variant="ghost" onClick={onClose} className="text-ops-dim hover:text-ops-text font-mono text-xs">DISMISS</Button>
+          <div className="flex gap-2">
+            {step > 0 && (
+              <Button
+                variant="outline"
+                onClick={() => setStep(step - 1)}
+                className="border-ops-accent/50 text-ops-accent hover:bg-ops-accent/10 font-mono text-xs"
+              >
+                PREV
+              </Button>
+            )}
             {!lastStep ? (
-              <Button onClick={() => setStep(step + 1)} className="ml-2">Next</Button>
+              <Button
+                onClick={() => setStep(step + 1)}
+                className="bg-ops-accent text-ops-bg hover:bg-ops-light font-bold font-mono text-xs tracking-wider"
+              >
+                NEXT_INTEL
+              </Button>
             ) : (
-              <Button onClick={onClose} className="ml-2">Finish</Button>
+              <Button
+                onClick={onClose}
+                className="bg-ops-success text-ops-bg hover:bg-green-400 font-bold font-mono text-xs tracking-wider animate-pulse"
+              >
+                EXECUTE
+              </Button>
             )}
           </div>
         </DialogFooter>
