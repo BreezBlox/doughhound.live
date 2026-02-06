@@ -288,6 +288,11 @@ const Index = () => {
 
   if (isLoadingData) return <div className="min-h-screen bg-ops-bg flex items-center justify-center text-ops-accent animate-pulse">Initializing Ops Deck...</div>;
 
+  // If user has no sheet connected, show the setup screen
+  if (!user?.sheetId) {
+    return <SheetSetup onComplete={() => window.location.reload()} />;
+  }
+
   return (
     <SidebarProvider>
       <AppSidebar
