@@ -35,8 +35,8 @@ const PaycheckForm: React.FC<PaycheckFormProps> = ({
     initialValues && initialValues.occurrenceLimit
       ? "occurrences"
       : initialValues && initialValues.stopDate
-      ? "date"
-      : "none"
+        ? "date"
+        : "none"
   );
   const [occurrenceLimit, setOccurrenceLimit] = useState<number | "">(
     initialValues && initialValues.occurrenceLimit ? initialValues.occurrenceLimit : ""
@@ -242,19 +242,21 @@ const PaycheckForm: React.FC<PaycheckFormProps> = ({
         </div>
       </div>
 
-      <div>
-        <label className="font-medium uppercase text-sm text-mgs-lightgray block mb-1">
-          Custom Dates (optional):
-        </label>
-        <div className="mb-2">
-          <MultiDateCalendar selectedDates={customDates} onChange={setCustomDates} />
-        </div>
-        {customDates.length > 0 && (
-          <div className="text-xs text-mgs-lightertext mt-1">
-            Selected Dates: {customDates.sort().join(", ")}
+      {!editMode && (
+        <div>
+          <label className="font-medium uppercase text-sm text-mgs-lightgray block mb-1">
+            Custom Dates (optional):
+          </label>
+          <div className="mb-2">
+            <MultiDateCalendar selectedDates={customDates} onChange={setCustomDates} />
           </div>
-        )}
-      </div>
+          {customDates.length > 0 && (
+            <div className="text-xs text-mgs-lightertext mt-1">
+              Selected Dates: {customDates.sort().join(", ")}
+            </div>
+          )}
+        </div>
+      )}
       {editMode ? (
         <div className="flex gap-2">
           <Button
