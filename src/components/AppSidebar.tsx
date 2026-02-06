@@ -54,11 +54,11 @@ export function AppSidebar({ entries, onDeleteEntry, onEditEntry, editingEntryId
                     </div>
                 </div>
             </SidebarContent>
-            <SidebarFooter className="border-t border-sidebar-border p-4 bg-ops-bg">
+            <SidebarFooter className="border-t border-sidebar-border p-2 bg-ops-bg">
                 {user && (
-                    <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2">
-                            <img src={user.picture} alt={user.name} className="w-8 h-8 rounded-full border border-primary/50" />
+                            <img src={user.picture} alt={user.name} className="w-7 h-7 rounded-full border border-primary/50" />
                             <div className="flex flex-col overflow-hidden">
                                 <span className="text-xs font-bold truncate text-foreground">{user.name}</span>
                                 <span className="text-[10px] text-muted-foreground truncate">{user.email}</span>
@@ -71,13 +71,13 @@ export function AppSidebar({ entries, onDeleteEntry, onEditEntry, editingEntryId
                         )}
                         <button
                             onClick={onShowTutorial}
-                            className="w-full text-xs text-ops-accent border border-ops-accent/30 hover:bg-ops-accent/10 py-1 px-2 rounded mt-2 font-mono uppercase transition-colors"
+                            className="w-full text-xs text-ops-accent border border-ops-accent/30 hover:bg-ops-accent/10 py-1 px-2 rounded font-mono uppercase transition-colors"
                         >
                             Tutorial
                         </button>
                         <button
                             onClick={logout}
-                            className="w-full text-xs border border-destructive/30 text-destructive hover:bg-destructive/10 py-1 px-2 rounded mt-2 font-mono uppercase transition-colors"
+                            className="w-full text-xs border border-destructive/30 text-destructive hover:bg-destructive/10 py-1 px-2 rounded font-mono uppercase transition-colors"
                         >
                             Disconnect
                         </button>

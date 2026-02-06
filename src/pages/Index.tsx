@@ -80,8 +80,11 @@ const Index = () => {
     const endDate = new Date(calculationStartDate);
     endDate.setMonth(endDate.getMonth() + 24);
 
+    // 2.5. Filter out hidden entries
+    const visibleEntries = entries.filter(e => !hiddenIds.includes(e.id));
+
     // 3. Expand Recurring Entries
-    const recurringEntries = calculateRecurringEntries(entries, calculationStartDate, endDate);
+    const recurringEntries = calculateRecurringEntries(visibleEntries, calculationStartDate, endDate);
 
     // 4. Calculate Daily Balance (Raw)
     const dailyReservesRaw = calculateDailyReserves(recurringEntries, calculationStartDate, endDate);
@@ -93,7 +96,8 @@ const Index = () => {
     }));
 
     setReserves(dailyReserves);
-  }, [entries, dashboardConfig]);
+  }, [entries, dashboardConfig, hiddenIds]);
+
 
   // Load Data Effect
   useEffect(() => {

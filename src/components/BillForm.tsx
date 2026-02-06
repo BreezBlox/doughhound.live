@@ -36,8 +36,8 @@ const BillForm: React.FC<BillFormProps> = ({
     initialValues && initialValues.occurrenceLimit
       ? "occurrences"
       : initialValues && initialValues.stopDate
-      ? "date"
-      : "none"
+        ? "date"
+        : "none"
   );
   const [occurrenceLimit, setOccurrenceLimit] = useState<number | "">(
     initialValues && initialValues.occurrenceLimit ? initialValues.occurrenceLimit : ""
@@ -110,7 +110,7 @@ const BillForm: React.FC<BillFormProps> = ({
           className="font-roboto-mono bg-mgs-darkgray border-mgs-gray text-mgs-lightertext placeholder:text-mgs-lightgray/50 rounded-none"
         />
       </div>
-      
+
       <div>
         <label htmlFor={`billAmount-${formId}`} className="font-medium uppercase text-sm text-mgs-lightgray block mb-1">
           Amount:
@@ -125,7 +125,7 @@ const BillForm: React.FC<BillFormProps> = ({
           className="font-roboto-mono bg-mgs-darkgray border-mgs-gray text-mgs-lightertext placeholder:text-mgs-lightgray/50 rounded-none"
         />
       </div>
-      
+
       <div>
         <label htmlFor={`billDueDate-${formId}`} className="font-medium uppercase text-sm text-mgs-lightgray block mb-1">
           Due Date:
@@ -138,7 +138,7 @@ const BillForm: React.FC<BillFormProps> = ({
           className="font-roboto-mono bg-mgs-darkgray border-mgs-gray text-mgs-lightertext rounded-none"
         />
       </div>
-      
+
       <div>
         <label htmlFor={`billFrequency-${formId}`} className="font-medium uppercase text-sm text-mgs-lightgray block mb-1">
           Frequency Protocol:
@@ -155,7 +155,7 @@ const BillForm: React.FC<BillFormProps> = ({
           <option value="one-time">One-Time</option>
         </select>
       </div>
-      
+
       <div className="space-y-1">
         <label className="font-medium uppercase text-sm text-mgs-lightgray block mb-1">
           Termination Protocol:
@@ -174,7 +174,7 @@ const BillForm: React.FC<BillFormProps> = ({
               No Limit
             </label>
           </div>
-          
+
           <div className="flex items-center space-x-2">
             <input
               type="radio"
@@ -188,7 +188,7 @@ const BillForm: React.FC<BillFormProps> = ({
               Limit Occurrences
             </label>
           </div>
-          
+
           {useLimitType === "occurrences" && (
             <div className="ml-6">
               <Input
@@ -202,7 +202,7 @@ const BillForm: React.FC<BillFormProps> = ({
               />
             </div>
           )}
-          
+
           <div className="flex items-center space-x-2">
             <input
               type="radio"
@@ -216,7 +216,7 @@ const BillForm: React.FC<BillFormProps> = ({
               Stop Date
             </label>
           </div>
-          
+
           {useLimitType === "date" && (
             <div className="ml-6">
               <Input
@@ -230,20 +230,22 @@ const BillForm: React.FC<BillFormProps> = ({
           )}
         </div>
       </div>
-      
-      <div>
-        <label className="font-medium uppercase text-sm text-mgs-lightgray block mb-1">
-          Custom Dates (optional):
-        </label>
-        <div className="mb-2">
-          <MultiDateCalendar selectedDates={customDates} onChange={setCustomDates} />
-        </div>
-        {customDates.length > 0 && (
-          <div className="text-xs text-mgs-lightertext mt-1">
-            Selected Dates: {customDates.sort().join(', ')}
+
+      {!editMode && (
+        <div>
+          <label className="font-medium uppercase text-sm text-mgs-lightgray block mb-1">
+            Custom Dates (optional):
+          </label>
+          <div className="mb-2">
+            <MultiDateCalendar selectedDates={customDates} onChange={setCustomDates} />
           </div>
-        )}
-      </div>
+          {customDates.length > 0 && (
+            <div className="text-xs text-mgs-lightertext mt-1">
+              Selected Dates: {customDates.sort().join(', ')}
+            </div>
+          )}
+        </div>
+      )}
       {editMode ? (
         <div className="flex gap-2">
           <Button
