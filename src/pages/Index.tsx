@@ -75,6 +75,7 @@ const Index = () => {
       calculationStartDate = new Date();
       calculationStartDate.setDate(1); // Default to 1st of current month
     }
+    calculationStartDate.setHours(0, 0, 0, 0);
 
     // 2. Determine End Date (24 months out approx)
     const endDate = new Date(calculationStartDate);
@@ -204,6 +205,7 @@ const Index = () => {
   // Filter Chart Data based on Range
   const getChartData = () => {
     const now = new Date();
+    now.setHours(0, 0, 0, 0);
     let monthsToAdd = 3;
     if (chartRange === "1M") monthsToAdd = 1;
     if (chartRange === "2M") monthsToAdd = 2;
@@ -217,8 +219,10 @@ const Index = () => {
 
   // Insights
   const getLowestBalance = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const next30Days = reserves.filter(r => {
-      const diffTime = r.date.getTime() - new Date().getTime();
+      const diffTime = r.date.getTime() - today.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       return diffDays >= 0 && diffDays <= 30;
     });
@@ -351,7 +355,8 @@ const Index = () => {
                       // Find reserve for TODAY
                       const today = new Date();
                       today.setHours(0, 0, 0, 0);
-                      const todayReserve = reserves.find(r => r.date.getTime() === today.getTime());
+                      const todayKey = formatDateToYYYYMMDD(today);
+                      const todayReserve = reserves.find(r => formatDateToYYYYMMDD(r.date) === todayKey);
                       // Fallback to first if not found (e.g. range starts in future?), or 0
                       return (todayReserve?.reserve ?? reserves[0]?.reserve ?? 0).toFixed(2);
                     })()}

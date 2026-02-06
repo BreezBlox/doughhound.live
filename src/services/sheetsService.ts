@@ -1,4 +1,5 @@
 import { FinancialEntry, DashboardConfig } from '@/types';
+import { formatDateToYYYYMMDD, parseLocalDateString } from '@/utils/dateUtils';
 
 // Google Sheets API base URL
 const SHEETS_API_BASE = 'https://sheets.googleapis.com/v4/spreadsheets';
@@ -179,17 +180,28 @@ export async function fetchEntries(config: SheetsServiceConfig): Promise<Financi
         }
 
         // Parse rows into FinancialEntry objects
-        return data.values.map((row: string[]) => ({
-            id: row[0] || '',
-            type: row[1] as FinancialEntry['type'] || 'bill',
-            name: row[2] || '',
-            amount: parseFloat(row[3]) || 0,
-            date: new Date(row[4]),
-            frequency: row[5] as FinancialEntry['frequency'] || 'one-time',
-            occurrenceLimit: row[6] ? parseInt(row[6]) : undefined,
-            stopDate: row[7] ? new Date(row[7]) : undefined,
-            customDates: row[8] ? JSON.parse(row[8]) : undefined,
-        }));
+        return data.values.map((row: string[]) => {
+            let customDates: string[] | undefined;
+            if (row[8]) {
+                try {
+                    customDates = JSON.parse(row[8]);
+                } catch (error) {
+                    console.warn('Failed to parse customDates:', error);
+                }
+            }
+
+            return {
+                id: row[0] || '',
+                type: row[1] as FinancialEntry['type'] || 'bill',
+                name: row[2] || '',
+                amount: parseFloat(row[3]) || 0,
+                date: row[4] ? parseLocalDateString(row[4]) : new Date(),
+                frequency: row[5] as FinancialEntry['frequency'] || 'one-time',
+                occurrenceLimit: row[6] ? parseInt(row[6]) : undefined,
+                stopDate: row[7] ? parseLocalDateString(row[7]) : undefined,
+                customDates,
+            };
+        });
     } catch (error) {
         if (error instanceof AuthError) throw error;
         console.error('Error fetching entries:', error);
@@ -209,10 +221,10 @@ export async function saveEntry(config: SheetsServiceConfig, entry: FinancialEnt
             entry.type,
             entry.name,
             entry.amount.toString(),
-            entry.date.toISOString(),
+            formatDateToYYYYMMDD(entry.date),
             entry.frequency,
             entry.occurrenceLimit?.toString() || '',
-            entry.stopDate?.toISOString() || '',
+            entry.stopDate ? formatDateToYYYYMMDD(entry.stopDate) : '',
             entry.customDates ? JSON.stringify(entry.customDates) : '',
         ];
 
@@ -362,10 +374,10 @@ export async function updateEntry(config: SheetsServiceConfig, entry: FinancialE
             entry.type,
             entry.name,
             entry.amount.toString(),
-            entry.date.toISOString(),
+            formatDateToYYYYMMDD(entry.date),
             entry.frequency,
             entry.occurrenceLimit?.toString() || '',
-            entry.stopDate?.toISOString() || '',
+            entry.stopDate ? formatDateToYYYYMMDD(entry.stopDate) : '',
             entry.customDates ? JSON.stringify(entry.customDates) : '',
         ];
 
@@ -459,7 +471,7 @@ export async function fetchDashboardSettings(config: SheetsServiceConfig): Promi
 
         if (values && values.length >= 2) {
             // First row (B3) is date
-            if (values[0][0]) startDate = new Date(values[0][0]);
+            if (values[0][0]) startDate = parseLocalDateString(values[0][0]);
             // Second row (B4) is balance
             if (values[1][0]) {
                 // Remove currency symbols if present
@@ -483,7 +495,7 @@ export async function updateDashboardSettings(config: SheetsServiceConfig, setti
     const { accessToken, sheetId } = config;
 
     try {
-        const formattedDate = settings.startDate ? settings.startDate.toISOString().split('T')[0] : '';
+        const formattedDate = settings.startDate ? formatDateToYYYYMMDD(settings.startDate) : '';
 
         const response = await fetch(
             `${SHEETS_API_BASE}/${sheetId}/values/${DASHBOARD_SHEET_NAME}!B3:B4?valueInputOption=USER_ENTERED`,

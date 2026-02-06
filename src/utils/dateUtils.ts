@@ -1,6 +1,14 @@
 
 import { DailyReserve, FinancialEntry, Frequency } from "@/types";
 
+export function normalizeLocalDate(date: Date): Date {
+  if (!(date instanceof Date) || isNaN(date.getTime())) {
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  }
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
 // Get the number of days in a month
 export function getDaysInMonth(year: number, month: number): number {
   return new Date(year, month + 1, 0).getDate();
@@ -62,14 +70,15 @@ export function getDaysBetween(startDate: Date, endDate: Date): number {
 
 // Calculate the next occurrence of a recurring entry
 export function getNextOccurrence(entry: FinancialEntry, currentDate: Date): Date | null {
+  const normalizedCurrent = normalizeLocalDate(currentDate);
   if (entry.frequency === 'one-time') {
-    return new Date(entry.date);
+    return normalizeLocalDate(entry.date);
   }
   
-  const entryDate = new Date(entry.date);
+  const entryDate = normalizeLocalDate(entry.date);
   let nextDate = new Date(entryDate);
   
-  while (nextDate < currentDate) {
+  while (nextDate < normalizedCurrent) {
     switch (entry.frequency) {
       case 'weekly':
         nextDate.setDate(nextDate.getDate() + 7);
@@ -93,27 +102,30 @@ export function calculateRecurringEntries(
   endDate: Date
 ): FinancialEntry[] {
   const allEntries: FinancialEntry[] = [];
+  const rangeStart = normalizeLocalDate(startDate);
+  const rangeEnd = normalizeLocalDate(endDate);
   
   entries.forEach(entry => {
     // Set to collect all unique occurrence dates
     const occurrenceDates = new Set<string>();
 
     // Add recurrence-generated dates (including one-time logic)
-    let currentDate = new Date(entry.date);
+    let currentDate = normalizeLocalDate(entry.date);
     if (entry.frequency === 'one-time') {
-      if (currentDate >= startDate && currentDate <= endDate) {
+      if (currentDate >= rangeStart && currentDate <= rangeEnd) {
         occurrenceDates.add(formatDateToYYYYMMDD(currentDate));
       }
     } else {
-      const effectiveEndDate = entry.stopDate && entry.stopDate < endDate 
-        ? entry.stopDate 
-        : endDate;
+      const normalizedStopDate = entry.stopDate ? normalizeLocalDate(entry.stopDate) : null;
+      const effectiveEndDate = normalizedStopDate && normalizedStopDate < rangeEnd
+        ? normalizedStopDate
+        : rangeEnd;
       let occurrenceCount = 0;
       while (currentDate <= effectiveEndDate) {
         if (entry.occurrenceLimit && occurrenceCount >= entry.occurrenceLimit) {
           break;
         }
-        if (currentDate >= startDate) {
+        if (currentDate >= rangeStart) {
           occurrenceDates.add(formatDateToYYYYMMDD(currentDate));
           occurrenceCount++;
         }
@@ -135,7 +147,7 @@ export function calculateRecurringEntries(
     if (entry.customDates && entry.customDates.length > 0) {
       entry.customDates.forEach(dateStr => {
         const customDate = parseLocalDateString(dateStr);
-        if (customDate >= startDate && customDate <= endDate) {
+        if (customDate >= rangeStart && customDate <= rangeEnd) {
           occurrenceDates.add(dateStr);
         }
       });
@@ -162,13 +174,15 @@ export function calculateDailyReserves(
   endDate: Date
 ): DailyReserve[] {
   const dailyReserves: DailyReserve[] = [];
-  let currentDate = new Date(startDate);
+  const rangeStart = normalizeLocalDate(startDate);
+  const rangeEnd = normalizeLocalDate(endDate);
+  let currentDate = new Date(rangeStart);
   let cumulativeReserve = 0;
   
   // Create a map of entries by date
   const entriesByDate: Record<string, FinancialEntry[]> = {};
   entries.forEach(entry => {
-    const dateKey = formatDateToYYYYMMDD(new Date(entry.date));
+    const dateKey = formatDateToYYYYMMDD(normalizeLocalDate(entry.date));
     if (!entriesByDate[dateKey]) {
       entriesByDate[dateKey] = [];
     }
@@ -176,8 +190,8 @@ export function calculateDailyReserves(
   });
   
   // Calculate reserve for each day
-  while (currentDate <= endDate) {
-    const dateKey = formatDateToYYYYMMDD(new Date(currentDate));
+  while (currentDate <= rangeEnd) {
+    const dateKey = formatDateToYYYYMMDD(currentDate);
     const dayEntries = entriesByDate[dateKey] || [];
     
     // Update cumulative reserve based on the day's entries
