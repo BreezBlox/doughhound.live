@@ -38,8 +38,8 @@ export function AppSidebar({ entries, onDeleteEntry, onEditEntry, editingEntryId
                 <h1 className="font-orbitron text-foreground text-xl tracking-widest font-bold">TRANSACTIONS</h1>
             </SidebarHeader>
             <SidebarContent className="bg-ops-bg">
-                <div className="p-2 h-full flex flex-col">
-                    <div className="flex-1 overflow-hidden mt-2">
+                <div className="p-2 h-full flex flex-col min-h-0">
+                    <div className="flex-1 min-h-0 mt-2">
                         <EntryList
                             entries={entries}
                             onDeleteEntry={onDeleteEntry}

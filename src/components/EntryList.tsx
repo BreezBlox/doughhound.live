@@ -34,7 +34,7 @@ const EntryList: React.FC<EntryListProps> = ({ entries, onDeleteEntry, onEditEnt
   const visibleEntries = filteredEntries.filter(entry => !hiddenIds.includes(entry.id));
 
   return (
-    <div>
+    <div className="flex flex-col h-full min-h-0">
       <div className="flex justify-center gap-1 mb-4 border-b border-mgs-gray pb-2">
         <button
           className={`px-3 py-1 text-sm font-orbitron ${activeTab === 'all' ? 'bg-mgs-green text-mgs-black' : 'bg-mgs-darkgray text-mgs-lightgray'}`}
@@ -56,7 +56,7 @@ const EntryList: React.FC<EntryListProps> = ({ entries, onDeleteEntry, onEditEnt
         </button>
       </div>
 
-      <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+      <div className="space-y-2 flex-1 min-h-0 overflow-y-auto pr-1">
         {filteredEntries.length === 0 ? (
           <div className="text-center text-mgs-lightgray py-4 border border-mgs-gray bg-mgs-darkgray/30">
             No entries found
