@@ -17,12 +17,15 @@ export default function Login() {
     }
 
     const googleLogin = useGoogleLogin({
-        onSuccess: (tokenResponse) => {
-            login(tokenResponse.access_token);
+        onSuccess: async (tokenResponse) => {
+            await login({
+                accessToken: tokenResponse.access_token,
+                idToken: tokenResponse.id_token,
+            });
             navigate(from, { replace: true });
         },
         onError: errorResponse => console.error('Login Failed:', errorResponse),
-        scope: 'https://www.googleapis.com/auth/spreadsheets',
+        scope: 'openid email profile https://www.googleapis.com/auth/spreadsheets',
     });
 
     return (

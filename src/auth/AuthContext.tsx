@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { supabase } from '@/services/supabaseClient';
+import { fetchProfileSheetId, getSupabaseUserId, upsertProfileSheetId } from '@/services/profileService';
 
 // User type from Google OAuth
 export interface GoogleUser {
@@ -17,9 +19,9 @@ interface AuthContextType {
   user: AppUser | null;
   accessToken: string | null;
   isLoading: boolean;
-  login: (credential: string) => void;
-  logout: () => void;
-  setSheetId: (sheetId: string) => void;
+  login: (tokens: { accessToken: string; idToken?: string }) => Promise<void>;
+  logout: () => Promise<void>;
+  setSheetId: (sheetId: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -49,6 +51,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<AppUser | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [supabaseUserId, setSupabaseUserId] = useState<string | null>(null);
 
   // Load user from storage on mount
   useEffect(() => {
@@ -83,7 +86,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     validateAndLoad();
   }, []);
 
-  const login = async (token: string) => {
+  const login = async ({ accessToken: token, idToken }: { accessToken: string; idToken?: string }) => {
     try {
       // With access token (useGoogleLogin), we need to fetch user info
       const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v1/userinfo?alt=json', {
@@ -117,25 +120,67 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setAccessToken(token);
       localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(appUser));
       localStorage.setItem(TOKEN_STORAGE_KEY, token);
+
+      if (idToken) {
+        const { data, error } = await supabase.auth.signInWithIdToken({
+          provider: 'google',
+          token: idToken,
+        });
+
+        if (error) {
+          console.warn('Supabase sign-in failed:', error.message);
+          return;
+        }
+
+        const userId = data.user?.id ?? null;
+        if (!userId) {
+          console.warn('Supabase user ID missing after sign-in');
+          return;
+        }
+
+        setSupabaseUserId(userId);
+
+        const remoteSheetId = await fetchProfileSheetId(userId);
+        if (remoteSheetId) {
+          if (remoteSheetId !== appUser.sheetId) {
+            const updatedUser = { ...appUser, sheetId: remoteSheetId };
+            setUser(updatedUser);
+            localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updatedUser));
+          }
+        } else if (appUser.sheetId) {
+          await upsertProfileSheetId(userId, appUser.sheetId);
+        }
+      } else {
+        console.warn('Google ID token missing; profile sync to Supabase skipped');
+      }
     } catch (e) {
       console.error('Login error:', e);
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
     setUser(null);
     setAccessToken(null);
     localStorage.removeItem(USER_STORAGE_KEY);
     localStorage.removeItem(TOKEN_STORAGE_KEY);
+    setSupabaseUserId(null);
+    await supabase.auth.signOut();
   };
 
-  const setSheetId = (sheetId: string) => {
+  const setSheetId = async (sheetId: string) => {
     if (user) {
       const updatedUser = { ...user, sheetId };
       setUser(updatedUser);
       localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updatedUser));
       // Also save to user-specific storage for persistence across logins
       localStorage.setItem(`doughhound_userdata_${user.sub}`, JSON.stringify({ sheetId }));
+
+      const userId = supabaseUserId ?? await getSupabaseUserId();
+      if (userId) {
+        await upsertProfileSheetId(userId, sheetId);
+      } else {
+        console.warn('Supabase user not available; sheetId not synced remotely');
+      }
     }
   };
 

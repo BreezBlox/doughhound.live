@@ -58,7 +58,7 @@ export default function SheetSetup({ onComplete }: SheetSetupProps) {
             }
 
             // Save the sheet ID to user profile
-            setSheetId(extractedId);
+            await setSheetId(extractedId);
             onComplete();
         } catch (err) {
             console.error('Sheet setup error:', err);
