@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/auth/AuthContext';
 
@@ -9,11 +10,13 @@ export default function Login() {
     // Get the intended destination or default to home
     const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/';
 
-    // If already logged in, redirect
-    if (user) {
-        navigate(from, { replace: true });
-        return null;
-    }
+    useEffect(() => {
+        if (user) {
+            navigate(from, { replace: true });
+        }
+    }, [user, navigate, from]);
+
+    if (user) return null;
 
     const handleLogin = async () => {
         await login();

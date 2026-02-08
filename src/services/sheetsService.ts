@@ -1,4 +1,4 @@
-import { FinancialEntry, DashboardConfig } from '@/types';
+import { FinancialEntry, DashboardConfig, Frequency } from '@/types';
 import { formatDateToYYYYMMDD, parseLocalDateString } from '@/utils/dateUtils';
 
 // Google Sheets API base URL
@@ -10,9 +10,29 @@ const DASHBOARD_SHEET_NAME = 'Dashboard';
 // Sheet structure: Header row + data rows
 const HEADERS = ['id', 'type', 'name', 'amount', 'date', 'frequency', 'occurrenceLimit', 'stopDate', 'customDates'];
 
+const SUPPORTED_FREQUENCIES: Frequency[] = ['one-time', 'weekly', 'bi-weekly', 'every-4-weeks', 'monthly'];
+
+function parseFrequency(value: unknown): Frequency {
+    if (typeof value === 'string' && SUPPORTED_FREQUENCIES.includes(value as Frequency)) {
+        return value as Frequency;
+    }
+    return 'one-time';
+}
+
 interface SheetsServiceConfig {
     accessToken: string;
     sheetId: string;
+}
+
+interface SpreadsheetSheet {
+    properties: {
+        title: string;
+        sheetId: number;
+    };
+}
+
+interface SpreadsheetMetadata {
+    sheets?: SpreadsheetSheet[];
 }
 
 /**
@@ -45,15 +65,15 @@ export async function initializeSheet(config: SheetsServiceConfig): Promise<bool
 
         if (!metadataResponse.ok) return false;
 
-        const metadata = await metadataResponse.json();
+        const metadata = await metadataResponse.json() as SpreadsheetMetadata;
         const sheets = metadata.sheets || [];
 
         // 2. Check for "Transactions" sheet (Case Insensitive)
-        const transactionsSheet = sheets.find((s: any) => s.properties.title.toLowerCase() === SHEET_NAME.toLowerCase());
+        const transactionsSheet = sheets.find((s) => s.properties.title.toLowerCase() === SHEET_NAME.toLowerCase());
 
         if (!transactionsSheet) {
             // Find a candidate to rename (usually the first one if it's not Dashboard)
-            const candidate = sheets.find((s: any) => s.properties.title !== DASHBOARD_SHEET_NAME);
+            const candidate = sheets.find((s) => s.properties.title !== DASHBOARD_SHEET_NAME);
 
             if (candidate) {
                 // Rename candidate to 'Transactions'
@@ -190,14 +210,17 @@ export async function fetchEntries(config: SheetsServiceConfig): Promise<Financi
                 }
             }
 
+            const parsedAmount = parseFloat(row[3]);
+            const parsedOccurrenceLimit = row[6] ? parseInt(row[6], 10) : NaN;
+
             return {
                 id: row[0] || '',
                 type: row[1] as FinancialEntry['type'] || 'bill',
                 name: row[2] || '',
-                amount: parseFloat(row[3]) || 0,
+                amount: Number.isFinite(parsedAmount) ? parsedAmount : 0,
                 date: row[4] ? parseLocalDateString(row[4]) : new Date(),
-                frequency: row[5] as FinancialEntry['frequency'] || 'one-time',
-                occurrenceLimit: row[6] ? parseInt(row[6]) : undefined,
+                frequency: parseFrequency(row[5]),
+                occurrenceLimit: Number.isFinite(parsedOccurrenceLimit) && parsedOccurrenceLimit > 0 ? parsedOccurrenceLimit : undefined,
                 stopDate: row[7] ? parseLocalDateString(row[7]) : undefined,
                 customDates,
             };

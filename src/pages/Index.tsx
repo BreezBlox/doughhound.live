@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import LineGraph, { IntervalType } from "@/components/LineGraph";
 import { MONTH_OPTIONS } from "@/utils/monthOptions";
 import { useAuth } from "@/auth/AuthContext";
-import { FinancialEntry, EntryType, DailyReserve, DashboardConfig } from "@/types";
+import { FinancialEntry, EntryType, DailyReserve, DashboardConfig, Frequency } from "@/types";
 import { calculateRecurringEntries, calculateDailyReserves, formatDateToMonthDayYear, formatDateToYYYYMMDD, parseLocalDateString } from "@/utils/dateUtils";
 import { v4 as uuidv4 } from "uuid";
 import * as sheetsService from "@/services/sheetsService";
@@ -21,6 +21,26 @@ import { CalendarIcon, Edit2, Loader2, Plus, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import OnboardingDialog from "@/components/OnboardingDialog";
 import SheetSetup from "@/components/SheetSetup";
+
+const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> => {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await new Promise<T>((resolve, reject) => {
+      timeoutId = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+      promise.then(resolve, reject);
+    });
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+};
+
+type TransactionFormState = {
+  date: string;
+  description: string;
+  amount: string;
+  frequency: Frequency;
+  limit: string;
+};
 
 const Index = () => {
   const { user, accessToken, logout } = useAuth();
@@ -53,11 +73,11 @@ const Index = () => {
 
   // Form State
   const [formType, setFormType] = useState<"expense" | "paycheck">("expense");
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<TransactionFormState>({
     date: formatDateToYYYYMMDD(new Date()),
     description: "",
     amount: "",
-    frequency: "one-time" as const,
+    frequency: "one-time",
     limit: ""
   });
 
@@ -107,8 +127,16 @@ const Index = () => {
         setIsLoadingData(true);
         try {
           const [loadedEntries, loadedConfig] = await Promise.all([
-            sheetsService.fetchEntries({ accessToken, sheetId: user.sheetId }),
-            sheetsService.fetchDashboardSettings({ accessToken, sheetId: user.sheetId })
+            withTimeout(
+              sheetsService.fetchEntries({ accessToken, sheetId: user.sheetId }),
+              15000,
+              "Entries load"
+            ),
+            withTimeout(
+              sheetsService.fetchDashboardSettings({ accessToken, sheetId: user.sheetId }),
+              15000,
+              "Dashboard settings load"
+            )
           ]);
           setEntries(loadedEntries);
           setDashboardConfig(loadedConfig);
@@ -118,6 +146,7 @@ const Index = () => {
             logout(); // Force logout to clear invalid state
           } else {
             console.error('Failed to load data:', error);
+            toast.error("Data load failed. Try refreshing once.");
           }
         } finally {
           setIsLoadingData(false);
@@ -127,7 +156,7 @@ const Index = () => {
       }
     };
     loadData();
-  }, [user?.sheetId, accessToken]);
+  }, [user?.sheetId, accessToken, logout]);
 
   // Handlers
   const handleReconcile = async () => {
@@ -311,7 +340,7 @@ const Index = () => {
 
   // If user has no sheet connected, show the setup screen
   if (!user?.sheetId) {
-    return <SheetSetup onComplete={() => window.location.reload()} />;
+    return <SheetSetup onComplete={() => undefined} />;
   }
 
   return (
@@ -381,7 +410,7 @@ const Index = () => {
               <Card className="bg-ops-card border-ops-border shadow-lg">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-lg font-orbitron text-white">Projection</CardTitle>
-                  <Tabs defaultValue="3M" className="w-auto" onValueChange={(v) => setChartRange(v as any)}>
+                  <Tabs defaultValue="3M" className="w-auto" onValueChange={(v) => setChartRange(v as "1M" | "2M" | "3M" | "ALL")}>
                     <TabsList className="bg-ops-panel h-8 border border-ops-border">
                       <TabsTrigger value="1M" className="text-xs font-mono data-[state=active]:bg-ops-accent data-[state=active]:text-ops-bg h-6">1M</TabsTrigger>
                       <TabsTrigger value="2M" className="text-xs font-mono data-[state=active]:bg-ops-accent data-[state=active]:text-ops-bg h-6">2M</TabsTrigger>
@@ -511,7 +540,7 @@ const Index = () => {
                     </div>
                     <div className="space-y-1">
                       <Label className="text-[10px] font-mono text-ops-dim uppercase">Frequency</Label>
-                      <Select value={formData.frequency} onValueChange={(v: any) => setFormData({ ...formData, frequency: v })}>
+                      <Select value={formData.frequency} onValueChange={(v: Frequency) => setFormData({ ...formData, frequency: v })}>
                         <SelectTrigger className="bg-ops-panel border-ops-border text-white">
                           <SelectValue />
                         </SelectTrigger>

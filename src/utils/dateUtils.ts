@@ -1,6 +1,27 @@
 
 import { DailyReserve, FinancialEntry, Frequency } from "@/types";
 
+const MAX_RECURRING_ITERATIONS = 5000;
+
+function advanceRecurringDate(date: Date, frequency: Frequency): boolean {
+  switch (frequency) {
+    case "weekly":
+      date.setDate(date.getDate() + 7);
+      return true;
+    case "bi-weekly":
+      date.setDate(date.getDate() + 14);
+      return true;
+    case "every-4-weeks":
+      date.setDate(date.getDate() + 28);
+      return true;
+    case "monthly":
+      date.setMonth(date.getMonth() + 1);
+      return true;
+    default:
+      return false;
+  }
+}
+
 export function normalizeLocalDate(date: Date): Date {
   if (!(date instanceof Date) || isNaN(date.getTime())) {
     const today = new Date();
@@ -43,6 +64,9 @@ export function parseLocalDateString(dateStr: string): Date {
     const year = parseInt(parts[0], 10);
     const month = parseInt(parts[1], 10) - 1; // Month is zero-based
     const day = parseInt(parts[2], 10);
+    if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+      return new Date();
+    }
     return new Date(year, month, day);
   }
   const d = new Date(dateStr);
@@ -76,20 +100,19 @@ export function getNextOccurrence(entry: FinancialEntry, currentDate: Date): Dat
   }
   
   const entryDate = normalizeLocalDate(entry.date);
-  let nextDate = new Date(entryDate);
-  
+  const nextDate = new Date(entryDate);
+  let iterations = 0;
+
   while (nextDate < normalizedCurrent) {
-    switch (entry.frequency) {
-      case 'weekly':
-        nextDate.setDate(nextDate.getDate() + 7);
-        break;
-      case 'bi-weekly':
-        nextDate.setDate(nextDate.getDate() + 14);
-        break;
-      case 'monthly':
-        nextDate.setMonth(nextDate.getMonth() + 1);
-        break;
+    if (iterations >= MAX_RECURRING_ITERATIONS) {
+      console.warn("getNextOccurrence exceeded max iterations", { entryId: entry.id, frequency: entry.frequency });
+      return null;
     }
+    if (!advanceRecurringDate(nextDate, entry.frequency)) {
+      console.warn("Unsupported recurrence frequency", { entryId: entry.id, frequency: entry.frequency });
+      return null;
+    }
+    iterations += 1;
   }
   
   return nextDate;
@@ -110,7 +133,7 @@ export function calculateRecurringEntries(
     const occurrenceDates = new Set<string>();
 
     // Add recurrence-generated dates (including one-time logic)
-    let currentDate = normalizeLocalDate(entry.date);
+    const currentDate = normalizeLocalDate(entry.date);
     if (entry.frequency === 'one-time') {
       if (currentDate >= rangeStart && currentDate <= rangeEnd) {
         occurrenceDates.add(formatDateToYYYYMMDD(currentDate));
@@ -121,7 +144,15 @@ export function calculateRecurringEntries(
         ? normalizedStopDate
         : rangeEnd;
       let occurrenceCount = 0;
+      let iterations = 0;
       while (currentDate <= effectiveEndDate) {
+        if (iterations >= MAX_RECURRING_ITERATIONS) {
+          console.warn("calculateRecurringEntries exceeded max iterations", {
+            entryId: entry.id,
+            frequency: entry.frequency,
+          });
+          break;
+        }
         if (entry.occurrenceLimit && occurrenceCount >= entry.occurrenceLimit) {
           break;
         }
@@ -129,17 +160,11 @@ export function calculateRecurringEntries(
           occurrenceDates.add(formatDateToYYYYMMDD(currentDate));
           occurrenceCount++;
         }
-        switch (entry.frequency) {
-          case 'weekly':
-            currentDate.setDate(currentDate.getDate() + 7);
-            break;
-          case 'bi-weekly':
-            currentDate.setDate(currentDate.getDate() + 14);
-            break;
-          case 'monthly':
-            currentDate.setMonth(currentDate.getMonth() + 1);
-            break;
+        if (!advanceRecurringDate(currentDate, entry.frequency)) {
+          console.warn("Unsupported recurrence frequency", { entryId: entry.id, frequency: entry.frequency });
+          break;
         }
+        iterations += 1;
       }
     }
 
@@ -176,7 +201,7 @@ export function calculateDailyReserves(
   const dailyReserves: DailyReserve[] = [];
   const rangeStart = normalizeLocalDate(startDate);
   const rangeEnd = normalizeLocalDate(endDate);
-  let currentDate = new Date(rangeStart);
+  const currentDate = new Date(rangeStart);
   let cumulativeReserve = 0;
   
   // Create a map of entries by date

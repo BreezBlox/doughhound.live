@@ -1,7 +1,7 @@
 
 export type EntryType = 'bill' | 'paycheck' | 'purchase';
 
-export type Frequency = 'weekly' | 'bi-weekly' | 'monthly' | 'one-time';
+export type Frequency = 'weekly' | 'bi-weekly' | 'monthly' | 'every-4-weeks' | 'one-time';
 
 export interface FinancialEntry {
   id: string;
